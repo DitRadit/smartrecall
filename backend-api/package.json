@@ -1,0 +1,39 @@
+{
+  "name": "smartrecall-backend-api",
+  "version": "1.0.0",
+  "description": "SmartRecall backend-api (Node.js + Express) - satu-satunya gateway ke frontend, orkestrasi ai-service, SM-2, auth.",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "seed": "node database/seeds/seed.js",
+    "test": "jest --runInBand"
+  },
+  "keywords": [
+    "smartrecall",
+    "spaced-repetition",
+    "offline-first"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "axios": "^1.7.4",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "form-data": "^4.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.4",
+    "prisma": "^5.18.0",
+    "supertest": "^7.0.0"
+  }
+}

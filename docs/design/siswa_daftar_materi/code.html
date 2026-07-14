@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+
+<html lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tap-target {
+            min-height: 48px;
+            min-width: 48px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#cbdbf5",
+                        "primary-fixed-dim": "#adc8f5",
+                        "on-secondary-fixed": "#2a1700",
+                        "inverse-primary": "#adc8f5",
+                        "primary": "#022448",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "tertiary-container": "#00422b",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-container": "#10b981",
+                        "primary-fixed": "#d5e3ff",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#dce9ff",
+                        "on-primary-fixed": "#001c3b",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "tertiary-fixed": "#6ffbbe",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-variant": "#d3e4fe",
+                        "on-primary-container": "#8aa4cf",
+                        "on-surface-variant": "#43474e",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "surface-container": "#e5eeff",
+                        "surface-bright": "#f8f9ff",
+                        "surface-tint": "#455f87",
+                        "primary-container": "#1e3a5f",
+                        "on-background": "#0b1c30",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline": "#74777f",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#684000",
+                        "secondary-container": "#fea619",
+                        "surface": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "secondary": "#855300",
+                        "outline-variant": "#c4c6cf",
+                        "inverse-surface": "#213145",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#002113",
+                        "on-primary-fixed-variant": "#2d486d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#0b1c30",
+                        "secondary-fixed": "#ffddb8",
+                        "tertiary": "#002a1a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "touch-target-min": "48px",
+                        "stack-sm": "12px",
+                        "container-padding": "20px",
+                        "gutter": "16px",
+                        "base": "8px",
+                        "stack-md": "24px",
+                        "stack-lg": "40px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Be Vietnam Pro"],
+                        "label-sm": ["Be Vietnam Pro"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "headline-lg-mobile": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "26px", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "30px", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface min-h-screen pb-24">
+<!-- Offline Banner - Predicted TopAppBar Variant -->
+<div class="w-full flex items-center justify-center py-2 px-4 gap-2 sticky top-0 z-40 bg-secondary-container text-on-secondary-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="cloud_off">cloud_off</span>
+<span class="font-label-md text-label-md font-bold">Sedang offline — menampilkan data tersimpan</span>
+</div>
+<!-- Main Top Bar -->
+<header class="flex justify-between items-center px-container-padding h-touch-target-min w-full bg-surface border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="school">school</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">SmartRecall</h1>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional and friendly student profile avatar for an educational app. The portrait is minimalist with a clean, soft-focus background in light blue tones. The lighting is bright and even, conveying a sense of optimism and focus. The overall aesthetic is modern and fits perfectly within a clean, light-mode user interface designed for learning." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQ37qXVWf6Ha9njzkz7JL3EjlL41YjEZL8EOgvv-mzDG8jFHNZn9fBIl7_kau0uRpc7_NzqveNSnbis1xzhhMoPE_UhaBAhDeiJnH5-TEr3Ic9HWVPGRoJy8KfLHz9C66s7igpA_fV3hNEuMtQeEwmnR9jHxRyXwppshXNZHMoiMmiRIyAmC4SmeAP52GKAVOxj_92e7UEvKDZIp6o0iFrlJbw_qyRNs3ppTU5tHvh1HGr6hCGS8E"/>
+</div>
+</header>
+<main class="px-container-padding pt-gutter space-y-gutter">
+<!-- Page Title -->
+<div class="py-2">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Materi Saya</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Daftar pelajaran yang tersedia untuk dipelajari.</p>
+</div>
+<!-- Materials List -->
+<div class="space-y-4">
+<!-- Card 1: Matematika -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter flex items-start gap-4 active:bg-surface-container transition-colors cursor-pointer border-t-4 border-t-secondary-container">
+<div class="w-14 h-14 rounded-lg bg-primary-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-primary text-[32px]" data-icon="calculate">calculate</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-headline-md text-headline-md text-primary">Pecahan Dasar</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Matematika • Modul 1</p>
+<div class="mt-3 w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[75%] rounded-full"></div>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-2">75% Selesai</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant self-center" data-icon="chevron_right">chevron_right</span>
+</div>
+<!-- Card 2: Bahasa Indonesia -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter flex items-start gap-4 active:bg-surface-container transition-colors cursor-pointer border-t-4 border-t-secondary-container">
+<div class="w-14 h-14 rounded-lg bg-tertiary-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-tertiary-container text-[32px]" data-icon="menu_book">menu_book</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-headline-md text-headline-md text-primary">Puisi &amp; Prosa</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Bahasa Indonesia • Modul 4</p>
+<div class="mt-3 w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[20%] rounded-full"></div>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-2">Baru Dimulai</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant self-center" data-icon="chevron_right">chevron_right</span>
+</div>
+<!-- Card 3: IPA -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter flex items-start gap-4 active:bg-surface-container transition-colors cursor-pointer border-t-4 border-t-secondary-container">
+<div class="w-14 h-14 rounded-lg bg-secondary-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-secondary-container text-[32px]" data-icon="science">science</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-headline-md text-headline-md text-primary">Siklus Air</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">IPA • Modul 2</p>
+<div class="mt-3 w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-0 rounded-full"></div>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-2">Belum Dipelajari</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant self-center" data-icon="chevron_right">chevron_right</span>
+</div>
+<!-- Card 4: Sejarah -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter flex items-start gap-4 active:bg-surface-container transition-colors cursor-pointer border-t-4 border-t-secondary-container">
+<div class="w-14 h-14 rounded-lg bg-surface-dim flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary text-[32px]" data-icon="history_edu">history_edu</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-headline-md text-headline-md text-primary">Pahlawan Nasional</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Sejarah • Modul 1</p>
+<div class="mt-3 w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[100%] rounded-full"></div>
+</div>
+<div class="flex items-center gap-1 mt-2">
+<span class="material-symbols-outlined text-on-tertiary-container text-sm" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<p class="font-label-sm text-label-sm text-on-tertiary-container">Selesai</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant self-center" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Sync CTA for Offline -->
+<div class="pt-stack-md">
+<button class="w-full bg-secondary-container text-on-secondary-container h-touch-target-min rounded-xl font-label-md text-label-md flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="sync">sync</span>
+                Sync Data Sekarang
+            </button>
+<p class="text-center font-label-sm text-label-sm text-on-surface-variant mt-4">Terakhir diperbarui: Hari ini, 08:30</p>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 bg-surface border-t border-outline-variant z-50 shadow-sm">
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-xl px-6 py-1 transition-transform active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="local_library" style="font-variation-settings: 'FILL' 1;">local_library</span>
+<span class="font-label-sm text-label-sm">Belajar</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant active:bg-surface-container-high transition-transform active:scale-90 px-6 py-1 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm">Profil</span>
+</a>
+</nav>
+<script>
+        // Micro-interaction for material cards
+        document.querySelectorAll('.cursor-pointer').forEach(card => {
+            card.addEventListener('touchstart', function() {
+                this.classList.add('scale-[0.98]');
+            });
+            card.addEventListener('touchend', function() {
+                this.classList.remove('scale-[0.98]');
+            });
+        });
+
+        // Simulating an offline effect for the sync button
+        const syncBtn = document.querySelector('button');
+        syncBtn.addEventListener('click', () => {
+            const originalText = syncBtn.innerHTML;
+            syncBtn.innerHTML = `<span class="material-symbols-outlined animate-spin" data-icon="sync">sync</span> Sinkronisasi...`;
+            syncBtn.disabled = true;
+            
+            setTimeout(() => {
+                syncBtn.innerHTML = `<span class="material-symbols-outlined" data-icon="check">check</span> Berhasil Disinkronkan`;
+                syncBtn.classList.replace('bg-secondary-container', 'bg-tertiary-fixed-dim');
+                syncBtn.classList.replace('text-on-secondary-container', 'text-on-tertiary-fixed');
+                
+                setTimeout(() => {
+                    syncBtn.innerHTML = originalText;
+                    syncBtn.classList.replace('bg-tertiary-fixed-dim', 'bg-secondary-container');
+                    syncBtn.classList.replace('text-on-tertiary-fixed', 'text-on-secondary-container');
+                    syncBtn.disabled = false;
+                }, 2000);
+            }, 1500);
+        });
+    </script>
+</body></html>

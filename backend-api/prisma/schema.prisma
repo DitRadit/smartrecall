@@ -1,0 +1,166 @@
+// SmartRecall - Prisma schema
+// Sesuai data model di ARCHITECTURE.md bagian 4.
+// Relasi inti yang wajib dipertahankan: Materi -> Flashcard/BankSoal, Siswa -> ReviewProgress.
+// Perubahan skema WAJIB lewat file migration (`prisma migrate dev`), bukan edit langsung ke DB.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Default: SQLite (lih. ARCHITECTURE.md bagian 7).
+  // Untuk migrasi ke PostgreSQL: ubah provider jadi "postgresql" dan
+  // sesuaikan DATABASE_URL, skema di bawah tetap kompatibel.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Catatan: SQLite tidak mendukung native enum di Prisma, jadi Role/MateriStatus/
+// ContentStatus disimpan sebagai String biasa. Validasi nilai dilakukan di level
+// aplikasi (lihat middleware/auth.js untuk role, controllers untuk status).
+// Nilai valid Role: "guru" | "siswa"
+// Nilai valid MateriStatus: "draft" | "published"
+// Nilai valid ContentStatus: "draft" | "approved"
+
+model User {
+  id           Int      @id @default(autoincrement())
+  nama         String
+  role         String
+  // Semua role (guru & siswa) login dengan username + password.
+  // Akun dibuatkan oleh guru/admin sekolah saat onboarding (bukan
+  // self-registration terbuka) -- lihat PRD.md FR-9 & 15.1.
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  nis          String?  @unique // opsional, identifier administratif tambahan untuk siswa
+  kelasId      String?  @map("kelas_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relasi: guru yang membuat materi
+  materiDiunggah Materi[] @relation("GuruMateri")
+
+  // Relasi: progres & log review milik siswa
+  reviewProgress ReviewProgress[]
+  reviewLogs     ReviewLog[]
+  rangkumanDibaca RangkumanRead[]
+  quizAttempts   QuizAttempt[]
+
+  @@map("users")
+}
+
+model Materi {
+  id           Int          @id @default(autoincrement())
+  guruId       Int          @map("guru_id")
+  guru         User         @relation("GuruMateri", fields: [guruId], references: [id])
+  judul        String
+  fileOriginal String       @map("file_original")
+  status       String       @default("draft")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  flashcards Flashcard[]
+  bankSoal   BankSoal[]
+  rangkuman  Rangkuman?
+  quizAttempts QuizAttempt[]
+
+  @@map("materi")
+}
+
+model Flashcard {
+  id          Int           @id @default(autoincrement())
+  materiId    Int           @map("materi_id")
+  materi      Materi        @relation(fields: [materiId], references: [id], onDelete: Cascade)
+  pertanyaan  String
+  jawaban     String
+  status      String        @default("draft")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  reviewProgress ReviewProgress[]
+  reviewLogs     ReviewLog[]
+
+  @@map("flashcards")
+}
+
+model BankSoal {
+  id            Int           @id @default(autoincrement())
+  materiId      Int           @map("materi_id")
+  materi        Materi        @relation(fields: [materiId], references: [id], onDelete: Cascade)
+  pertanyaan    String
+  opsiJawaban   String        @map("opsi_jawaban") // disimpan sebagai JSON string, mis. ["A","B","C","D"]
+  jawabanBenar  String        @map("jawaban_benar")
+  status        String        @default("draft")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@map("bank_soal")
+}
+
+model ReviewProgress {
+  id                Int      @id @default(autoincrement())
+  siswaId           Int      @map("siswa_id")
+  siswa             User     @relation(fields: [siswaId], references: [id])
+  flashcardId       Int      @map("flashcard_id")
+  flashcard         Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  repetitionNumber  Int      @default(0) @map("repetition_number")
+  easeFactor        Float    @default(2.5) @map("ease_factor")
+  interval          Int      @default(0)
+  nextReviewDate    DateTime @map("next_review_date")
+  lastReviewedAt    DateTime? @map("last_reviewed_at")
+
+  @@unique([siswaId, flashcardId])
+  @@map("review_progress")
+}
+
+// Log historis setiap kali siswa mengerjakan review (beda dengan ReviewProgress
+// yang cuma menyimpan state SM-2 TERKINI). Dipakai reviewController.js untuk
+// mencatat skorKualitas (0-5) tiap submit, supaya progres bisa dilihat sebagai
+// riwayat dari waktu ke waktu, bukan cuma snapshot terakhir.
+model ReviewLog {
+  id           Int      @id @default(autoincrement())
+  siswaId      Int      @map("siswa_id")
+  siswa        User     @relation(fields: [siswaId], references: [id])
+  flashcardId  Int      @map("flashcard_id")
+  flashcard    Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  skorKualitas Int      @map("skor_kualitas") // skor 0-5 sesuai algoritma SM-2
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("review_log")
+}
+
+model Rangkuman {
+  id         Int           @id @default(autoincrement())
+  materiId   Int           @unique @map("materi_id") // satu rangkuman per materi
+  materi     Materi        @relation(fields: [materiId], references: [id], onDelete: Cascade)
+  konten     String
+  status     String        @default("draft")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  dibacaOleh RangkumanRead[]
+
+  @@map("rangkuman")
+}
+
+// Menandai siswa mana saja yang sudah membaca rangkuman tertentu (opsional,
+// untuk visibilitas guru soal progres baca -- tidak wajib untuk MVP).
+model RangkumanRead {
+  id          Int       @id @default(autoincrement())
+  rangkumanId Int       @map("rangkuman_id")
+  rangkuman   Rangkuman @relation(fields: [rangkumanId], references: [id], onDelete: Cascade)
+  siswaId     Int       @map("siswa_id")
+  siswa       User      @relation(fields: [siswaId], references: [id])
+  readAt      DateTime  @default(now()) @map("read_at")
+
+  @@unique([rangkumanId, siswaId])
+  @@map("rangkuman_read")
+}
+
+model QuizAttempt {
+  id           Int      @id @default(autoincrement())
+  siswaId      Int      @map("siswa_id")
+  siswa        User     @relation(fields: [siswaId], references: [id])
+  materiId     Int      @map("materi_id")
+  materi       Materi   @relation(fields: [materiId], references: [id], onDelete: Cascade)
+  skorBenar    Int      @map("skor_benar")
+  totalSoal    Int      @map("total_soal")
+  jawabanDetail String  @map("jawaban_detail") // JSON string: [{soal_id, jawaban_dipilih, benar}]
+  submittedAt  DateTime @default(now()) @map("submitted_at")
+
+  @@map("quiz_attempts")
+}

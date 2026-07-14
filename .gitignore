@@ -1,0 +1,49 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Build and test output
+dist/
+build/
+coverage/
+.coverage
+htmlcov/
+
+# Local data and uploads
+*.db
+*.db-shm
+*.db-wal
+ai-service/uploads/*
+!ai-service/uploads/.gitkeep
+backend-api/database/*
+!backend-api/database/.gitkeep
+backend-api/prisma/database/*
+!backend-api/prisma/database/.gitkeep
+
+# Editor and operating system
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+tmp/
+temp/

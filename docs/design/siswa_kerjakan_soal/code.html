@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+
+<html class="light" lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SmartRecall - Kerjakan Soal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#cbdbf5",
+                        "primary-fixed-dim": "#adc8f5",
+                        "on-secondary-fixed": "#2a1700",
+                        "inverse-primary": "#adc8f5",
+                        "primary": "#022448",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "tertiary-container": "#00422b",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-container": "#10b981",
+                        "primary-fixed": "#d5e3ff",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#dce9ff",
+                        "on-primary-fixed": "#001c3b",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "tertiary-fixed": "#6ffbbe",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-variant": "#d3e4fe",
+                        "on-primary-container": "#8aa4cf",
+                        "on-surface-variant": "#43474e",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "surface-container": "#e5eeff",
+                        "surface-bright": "#f8f9ff",
+                        "surface-tint": "#455f87",
+                        "primary-container": "#1e3a5f",
+                        "on-background": "#0b1c30",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline": "#74777f",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#684000",
+                        "secondary-container": "#fea619",
+                        "surface": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "secondary": "#855300",
+                        "outline-variant": "#c4c6cf",
+                        "inverse-surface": "#213145",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#002113",
+                        "on-primary-fixed-variant": "#2d486d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#0b1c30",
+                        "secondary-fixed": "#ffddb8",
+                        "tertiary": "#002a1a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "touch-target-min": "48px",
+                        "stack-sm": "12px",
+                        "container-padding": "20px",
+                        "gutter": "16px",
+                        "base": "8px",
+                        "stack-md": "24px",
+                        "stack-lg": "40px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Be Vietnam Pro"],
+                        "label-sm": ["Be Vietnam Pro"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "headline-lg-mobile": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "26px", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "30px", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .option-card:has(input:checked) {
+            border-color: #fea619;
+            background-color: #fffbeb;
+            box-shadow: 0 0 0 1px #fea619;
+        }
+        .option-card:has(input:checked) .radio-custom {
+            border-color: #fea619;
+            background-color: #fea619;
+        }
+        .option-card:has(input:checked) .radio-custom::after {
+            content: "";
+            display: block;
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+        }
+        .result-overlay {
+            display: none;
+        }
+        .result-overlay.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- Top Navigation Anchor -->
+<header class="bg-surface border-b border-outline-variant w-full top-0 sticky z-30">
+<div class="flex justify-between items-center px-container-padding h-touch-target-min w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-2 cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined text-primary">school</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">SmartRecall</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="h-8 w-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden">
+<img class="h-full w-full object-cover" data-alt="A portrait of a young student in a casual blue shirt, looking friendly and engaged. The lighting is bright and natural, set in a clean, modern study environment with soft focus on the background to emphasize the user profile avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZ1GOf3-kVyQekYOO8gANwo8fGtcWT98n9Cp1Mj_jt43vZ1cIATlumww4on-dX2egNddeh5u8fWPe6QTg41ZN83WEKvg2sU1i_1d1WLm4bg09A9gnLFCTN6-bbfupZrLOxoSXI6415Us69nRICkY9m94igWStZQzACVtYF5RQvBCpZQMeII-eZEUAWxv8vv3YV0f33KL9ySZqQ6oLuIhVL7CIl2ZvqgCPc34IkaS2q55WLY5qjrfg"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Offline Banner (Style Anchor) -->
+<div class="w-full flex items-center justify-center py-2 px-4 gap-2 bg-secondary-container sticky top-touch-target-min z-20">
+<span class="material-symbols-outlined text-on-secondary-container text-[20px]">cloud_off</span>
+<span class="font-label-md text-label-md font-bold text-on-secondary-container">Offline Mode</span>
+</div>
+<!-- Quiz Content Canvas -->
+<main class="flex-grow w-full max-w-xl mx-auto px-container-padding py-stack-md">
+<!-- Progress Section -->
+<div class="mb-stack-md">
+<div class="flex justify-between items-end mb-2">
+<span class="font-label-md text-label-md text-on-surface-variant">Soal 8 dari 10</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">80% Selesai</span>
+</div>
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[80%] transition-all duration-500"></div>
+</div>
+</div>
+<!-- Question Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter mb-stack-md">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Apa ibukota dari Indonesia saat ini?</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Pilihlah jawaban yang paling tepat sesuai dengan konstitusi yang berlaku.</p>
+</div>
+<!-- Answer Options (Radio Buttons) -->
+<form class="space-y-base" id="quizForm">
+<label class="option-card flex items-center gap-4 p-4 bg-surface-container-lowest border border-outline-variant rounded-xl cursor-pointer active:bg-surface-container transition-colors min-h-touch-target-min">
+<input class="hidden" name="answer" type="radio" value="a"/>
+<div class="radio-custom w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center shrink-0"></div>
+<span class="font-body-md text-body-md text-on-surface">Bandung</span>
+</label>
+<label class="option-card flex items-center gap-4 p-4 bg-surface-container-lowest border border-outline-variant rounded-xl cursor-pointer active:bg-surface-container transition-colors min-h-touch-target-min">
+<input class="hidden" name="answer" type="radio" value="b"/>
+<div class="radio-custom w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center shrink-0"></div>
+<span class="font-body-md text-body-md text-on-surface">Jakarta</span>
+</label>
+<label class="option-card flex items-center gap-4 p-4 bg-surface-container-lowest border border-outline-variant rounded-xl cursor-pointer active:bg-surface-container transition-colors min-h-touch-target-min">
+<input class="hidden" name="answer" type="radio" value="c"/>
+<div class="radio-custom w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center shrink-0"></div>
+<span class="font-body-md text-body-md text-on-surface">Surabaya</span>
+</label>
+<label class="option-card flex items-center gap-4 p-4 bg-surface-container-lowest border border-outline-variant rounded-xl cursor-pointer active:bg-surface-container transition-colors min-h-touch-target-min">
+<input class="hidden" name="answer" type="radio" value="d"/>
+<div class="radio-custom w-5 h-5 rounded-full border-2 border-outline-variant flex items-center justify-center shrink-0"></div>
+<span class="font-body-md text-body-md text-on-surface">Medan</span>
+</label>
+</form>
+</main>
+<!-- Footer Action -->
+<footer class="p-container-padding bg-surface border-t border-outline-variant sticky bottom-0 z-30">
+<button class="w-full h-touch-target-min bg-secondary-container text-on-secondary-container font-label-md text-label-md font-bold rounded-xl active:scale-95 transition-transform flex items-center justify-center gap-2" onclick="showResults()">
+<span>Selesai</span>
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</footer>
+<!-- Results State Overlay -->
+<div class="result-overlay fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex-col items-center justify-center p-gutter animate-in fade-in duration-300" id="resultsOverlay">
+<div class="w-full max-w-sm bg-surface-container-lowest border border-outline-variant rounded-2xl p-stack-md flex flex-col items-center text-center shadow-sm">
+<div class="w-24 h-24 mb-stack-md relative">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container-high" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-on-tertiary-container" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="50.24" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-primary">8/10</span>
+</div>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-2">Bagus Sekali!</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-stack-md">Terus belajar ya, sedikit lagi kamu akan mencapai kesempurnaan!</p>
+<div class="w-full space-y-base">
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-label-md text-label-md font-bold rounded-xl active:scale-95 transition-transform" onclick="hideResults()">
+                    Lanjut Materi
+                </button>
+<button class="w-full h-touch-target-min bg-surface border border-outline-variant text-on-surface-variant font-label-md text-label-md font-bold rounded-xl active:scale-95 transition-transform" onclick="hideResults()">
+                    Ulangi Kuis
+                </button>
+</div>
+</div>
+</div>
+<!-- Bottom Nav Bar (Hidden for Task focus as per instructions) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 bg-surface border-t border-outline-variant hidden">
+<div class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-xl px-6 py-1 cursor-pointer">
+<span class="material-symbols-outlined">local_library</span>
+<span class="font-label-sm text-label-sm">Belajar</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant cursor-pointer">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-sm text-label-sm">Profil</span>
+</div>
+</nav>
+<script>
+        function showResults() {
+            const overlay = document.getElementById('resultsOverlay');
+            overlay.classList.add('active');
+            overlay.classList.remove('hidden');
+            // Trigger animation
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.transition = 'opacity 0.3s ease';
+                overlay.style.opacity = '1';
+            }, 10);
+        }
+
+        function hideResults() {
+            const overlay = document.getElementById('resultsOverlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 300);
+        }
+
+        // Handle option selection vibration/interaction
+        const options = document.querySelectorAll('.option-card');
+        options.forEach(option => {
+            option.addEventListener('click', () => {
+                const radio = option.querySelector('input');
+                radio.checked = true;
+                
+                // Visual feedback
+                option.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    option.style.transform = 'scale(1)';
+                }, 100);
+            });
+        });
+    </script>
+</body></html>

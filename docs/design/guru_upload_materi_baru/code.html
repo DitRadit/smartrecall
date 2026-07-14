@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+
+<html class="light" lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SmartRecall - Guru Upload Materi</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid #E2E8F0;
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .animate-pulse-soft {
+            animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#cbdbf5",
+                        "primary-fixed-dim": "#adc8f5",
+                        "on-secondary-fixed": "#2a1700",
+                        "inverse-primary": "#adc8f5",
+                        "primary": "#022448",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "tertiary-container": "#00422b",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-container": "#10b981",
+                        "primary-fixed": "#d5e3ff",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#dce9ff",
+                        "on-primary-fixed": "#001c3b",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "tertiary-fixed": "#6ffbbe",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-variant": "#d3e4fe",
+                        "on-primary-container": "#8aa4cf",
+                        "on-surface-variant": "#43474e",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "surface-container": "#e5eeff",
+                        "surface-bright": "#f8f9ff",
+                        "surface-tint": "#455f87",
+                        "primary-container": "#1e3a5f",
+                        "on-background": "#0b1c30",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline": "#74777f",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#684000",
+                        "secondary-container": "#fea619",
+                        "surface": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "secondary": "#855300",
+                        "outline-variant": "#c4c6cf",
+                        "inverse-surface": "#213145",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#002113",
+                        "on-primary-fixed-variant": "#2d486d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#0b1c30",
+                        "secondary-fixed": "#ffddb8",
+                        "tertiary": "#002a1a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "touch-target-min": "48px",
+                        "stack-sm": "12px",
+                        "container-padding": "20px",
+                        "gutter": "16px",
+                        "base": "8px",
+                        "stack-md": "24px",
+                        "stack-lg": "40px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Be Vietnam Pro"],
+                        "label-sm": ["Be Vietnam Pro"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "26px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-x-hidden">
+<!-- Top Navigation Shell -->
+<header class="bg-surface border-b border-outline-variant w-full top-0 sticky z-50">
+<div class="flex justify-between items-center px-container-padding h-touch-target-min w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-base">
+<span class="material-symbols-outlined text-primary text-headline-md">school</span>
+<span class="font-headline-md text-headline-md font-bold text-primary">SmartRecall</span>
+</div>
+<div class="flex items-center gap-stack-md">
+<div class="hidden md:flex gap-base">
+<button class="text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high transition-colors px-4 py-2 rounded-full cursor-pointer font-label-md text-label-md">Dashboard</button>
+<button class="text-primary dark:text-primary-fixed-dim font-bold hover:bg-surface-container-high transition-colors px-4 py-2 rounded-full cursor-pointer font-label-md text-label-md">Upload</button>
+</div>
+<div class="h-10 w-10 rounded-full bg-surface-container-highest flex items-center justify-center border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a teacher, smiling warmly against a soft-focus background of a modern classroom. The lighting is natural and bright, matching the clean corporate minimalist aesthetic. High contrast and high-resolution details emphasize a friendly, supportive digital tutor persona." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgvH588Q04rsaGRI_GajmwbiyjmGcCQ-tz2lvbhuKyibnG3MT4HMxx_km7g31WFWeTAG05KkwF2d-_1NNPtGdToToSstZ8BQwxG3xLNhW1HIkYT13we-ZRh7k43P_vMEChlH8X4jSqrS2tyOOC-5nuepZQADFffNZHiUOh8muHbUtWCSdrdm2DsgL3PyWRLioz4A-Cmlt5cr6YDtRSynrcYUwj-gPXnJ4mtMCwT0QVEsFdS9UmsoA"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Sidebar Navigation Shell (Desktop Only) -->
+<aside class="hidden md:flex flex-col gap-base p-gutter h-full w-64 fixed left-0 top-0 pt-20 border-r border-outline-variant bg-surface-container-lowest">
+<div class="mb-stack-md px-4">
+<h2 class="font-headline-md text-headline-md text-primary">Guru Dashboard</h2>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high rounded-full px-4 py-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="font-label-md text-label-md">Materi Saya</span>
+</a>
+<a class="flex items-center gap-3 bg-secondary-container text-on-secondary-container rounded-full px-4 py-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">cloud_upload</span>
+<span class="font-label-md text-label-md">Upload</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high rounded-full px-4 py-3 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-label-md text-label-md">Statistik</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="md:pl-64 pt-6 pb-20">
+<div class="max-w-5xl mx-auto px-container-padding">
+<!-- Header Section -->
+<div class="mb-stack-lg">
+<h1 class="font-headline-lg text-headline-lg text-primary mb-2">Upload Materi Pembelajaran</h1>
+<p class="text-on-surface-variant font-body-md">Ubah dokumen PDF Anda menjadi materi belajar interaktif bertenaga AI secara instan.</p>
+</div>
+<!-- Bento Layout Content -->
+<div class="bento-grid">
+<!-- Main Form Card (Col 8) -->
+<div class="col-span-12 lg:col-span-8 space-y-gutter">
+<section class="glass-card rounded-xl p-8 shadow-sm">
+<form class="space-y-6" id="uploadForm">
+<!-- Judul Materi -->
+<div class="space-y-2">
+<label class="block font-label-md text-label-md text-on-surface" for="judul">Judul Materi</label>
+<input class="w-full h-12 px-4 rounded-lg border border-outline focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all bg-white" id="judul" placeholder="Contoh: Sejarah Kemerdekaan Indonesia Kelas IX" type="text"/>
+</div>
+<!-- Upload Area -->
+<div class="space-y-2">
+<label class="block font-label-md text-label-md text-on-surface">File Materi (PDF)</label>
+<div class="border-2 border-dashed border-outline-variant rounded-xl p-10 flex flex-col items-center justify-center bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer group" id="drop-zone">
+<span class="material-symbols-outlined text-primary-container text-4xl mb-3 group-hover:scale-110 transition-transform">picture_as_pdf</span>
+<p class="font-label-md text-on-surface-variant mb-1">Tarik dan lepas file PDF di sini</p>
+<p class="text-label-sm text-outline">Atau klik untuk memilih file dari komputer</p>
+<input accept=".pdf" class="hidden" id="file-upload" type="file"/>
+</div>
+<div class="hidden flex items-center justify-between bg-secondary-fixed p-3 rounded-lg border border-secondary" id="file-selected">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-secondary-fixed">description</span>
+<span class="font-label-md text-on-secondary-fixed truncate max-w-xs" id="file-name">materi_sejarah.pdf</span>
+</div>
+<button class="text-on-secondary-fixed hover:opacity-70" type="button">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<!-- Jenis Konten Grid -->
+<div class="space-y-2">
+<label class="block font-label-md text-label-md text-on-surface">Pilih Jenis Konten AI</label>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<label class="relative cursor-pointer">
+<input checked="" class="peer sr-only" name="jenis_konten" type="radio" value="flashcard"/>
+<div class="p-4 rounded-xl border border-outline-variant peer-checked:border-secondary-container peer-checked:bg-secondary-fixed transition-all flex flex-col items-center gap-2 text-center">
+<span class="material-symbols-outlined text-secondary">style</span>
+<span class="font-label-md text-on-surface">Flashcard</span>
+</div>
+</label>
+<label class="relative cursor-pointer">
+<input class="peer sr-only" name="jenis_konten" type="radio" value="rangkuman"/>
+<div class="p-4 rounded-xl border border-outline-variant peer-checked:border-secondary-container peer-checked:bg-secondary-fixed transition-all flex flex-col items-center gap-2 text-center">
+<span class="material-symbols-outlined text-secondary">article</span>
+<span class="font-label-md text-on-surface">Rangkuman</span>
+</div>
+</label>
+<label class="relative cursor-pointer">
+<input class="peer sr-only" name="jenis_konten" type="radio" value="bank_soal"/>
+<div class="p-4 rounded-xl border border-outline-variant peer-checked:border-secondary-container peer-checked:bg-secondary-fixed transition-all flex flex-col items-center gap-2 text-center">
+<span class="material-symbols-outlined text-secondary">quiz</span>
+<span class="font-label-md text-on-surface">Bank Soal</span>
+</div>
+</label>
+</div>
+</div>
+<!-- AI Processing Banner (Conditional Visual) -->
+<div class="hidden space-y-4 pt-4" id="processing-state">
+<div class="flex items-center justify-between mb-1">
+<span class="text-label-md font-bold text-primary animate-pulse-soft">AI sedang menganalisis materi...</span>
+<span class="text-label-sm text-on-surface-variant">65%</span>
+</div>
+<div class="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary transition-all duration-500 ease-out" style="width: 65%;"></div>
+</div>
+</div>
+<!-- CTA & Helper -->
+<div class="pt-4 space-y-4">
+<div class="flex items-start gap-3 p-4 bg-surface-container-low rounded-lg border border-outline-variant">
+<span class="material-symbols-outlined text-primary-container">info</span>
+<p class="text-label-md text-on-surface-variant">
+                                        Proses AI butuh internet sesaat, hasil bisa diedit sebelum publish.
+                                    </p>
+</div>
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-xl font-label-md text-label-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md" id="generate-btn" type="button">
+<span class="material-symbols-outlined">bolt</span>
+                                    Generate Materi
+                                </button>
+</div>
+</form>
+</section>
+</div>
+<!-- Info Cards (Col 4) -->
+<div class="col-span-12 lg:col-span-4 space-y-gutter">
+<!-- Tips Card -->
+<div class="bg-surface rounded-xl border border-outline-variant p-6 h-fit">
+<h3 class="font-label-md text-label-md text-primary mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined">lightbulb</span>
+                            Tips Upload
+                        </h3>
+<ul class="space-y-4">
+<li class="flex gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[10px] flex-shrink-0">1</div>
+<p class="text-label-sm text-on-surface-variant">Pastikan teks pada PDF terbaca dengan jelas (bukan hasil scan gambar buram).</p>
+</li>
+<li class="flex gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[10px] flex-shrink-0">2</div>
+<p class="text-label-sm text-on-surface-variant">File maksimal berukuran 10MB untuk proses optimasi yang lebih cepat.</p>
+</li>
+<li class="flex gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center text-[10px] flex-shrink-0">3</div>
+<p class="text-label-sm text-on-surface-variant">Fokuskan konten pada satu sub-topik agar hasil AI lebih mendalam.</p>
+</li>
+</ul>
+</div>
+<!-- Offline Mode Status Card -->
+<div class="bg-primary-container rounded-xl p-6 text-on-primary">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-tertiary-fixed">cloud_done</span>
+<h3 class="font-label-md text-label-md">Status Cloud</h3>
+</div>
+<p class="text-label-sm text-on-primary-container mb-4">Materi akan disinkronisasi otomatis saat terhubung ke internet. Anda dapat melanjutkan menyusun soal saat offline.</p>
+<div class="flex items-center justify-between text-xs font-bold text-tertiary-fixed">
+<span>TERAKHIR SYNC: 2 MENIT LALU</span>
+<span class="material-symbols-outlined text-sm">refresh</span>
+</div>
+</div>
+<!-- Visual Accent Card -->
+<div class="relative rounded-xl overflow-hidden h-40 border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A modern 3D illustration of an artificial intelligence chip glowing with soft blue and amber light pulses. The background is a clean, minimalist workspace with a tablet showing educational charts. The visual style is Corporate Modernism with crisp edges, soft tonal depth, and high clarity, reinforcing a supportive digital tutor brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBzIH7pITBzfu9fCT14JguotzNQ99NqQqvwp0asAGJamKOmpeDKG1uwJlMnyZdEWLYm-SfdpNi9KoF3W6mX-vzeMTkt4x9XsLdX0_F5JvnOIk7tgM9MR8TjVxJhihgNVX4LdFCp4gPa_qj4XeHVXoigTZNCJY0KiDkbym4DnrAToUSXoB1mawr3L7QcV7a2dMZj88upfDo417s1QWOyN0UeWtgN8tHiwUtwkBSmZZHr0toXQdEdp0"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+<span class="text-white text-label-sm font-bold">Teknologi SmartRecall AI v2.4</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 bg-surface border-t border-outline-variant z-50 shadow-sm">
+<a class="flex flex-col items-center justify-center text-on-surface-variant py-1" href="#">
+<span class="material-symbols-outlined">local_library</span>
+<span class="font-label-sm text-label-sm">Belajar</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-xl px-6 py-1" href="#">
+<span class="material-symbols-outlined">cloud_upload</span>
+<span class="font-label-sm text-label-sm">Upload</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant py-1" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-sm text-label-sm">Profil</span>
+</a>
+</nav>
+<!-- Success Toast (Hidden by default) -->
+<div class="hidden fixed bottom-24 right-8 bg-tertiary-container text-on-tertiary-container px-6 py-4 rounded-xl shadow-lg flex items-center gap-4 border border-tertiary-fixed-dim z-[60]" id="sync-toast">
+<span class="material-symbols-outlined">check_circle</span>
+<span class="font-label-md">Sinkronisasi Selesai! Materi siap diedit.</span>
+</div>
+<script>
+        // Micro-interactions and UI Logic
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-upload');
+        const generateBtn = document.getElementById('generate-btn');
+        const processingState = document.getElementById('processing-state');
+        const fileSelected = document.getElementById('file-selected');
+        const fileNameDisplay = document.getElementById('file-name');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const fileName = e.target.files[0].name;
+                fileNameDisplay.textContent = fileName;
+                dropZone.classList.add('hidden');
+                fileSelected.classList.remove('hidden');
+            }
+        });
+
+        generateBtn.addEventListener('click', () => {
+            const btnText = generateBtn.querySelector('span:last-child');
+            const btnIcon = generateBtn.querySelector('.material-symbols-outlined');
+            
+            // Toggle visual state
+            processingState.classList.remove('hidden');
+            btnText.textContent = 'Menganalisis...';
+            btnIcon.classList.add('animate-spin');
+            generateBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            generateBtn.disabled = true;
+
+            // Simulate progress completion
+            let progress = 0;
+            const progressBar = processingState.querySelector('.h-full');
+            const progressText = processingState.querySelector('.text-label-sm');
+            
+            const interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 15);
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    showSuccess();
+                }
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `${progress}%`;
+            }, 500);
+        });
+
+        function showSuccess() {
+            const toast = document.getElementById('sync-toast');
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                window.location.reload(); // Reset for demo
+            }, 4000);
+        }
+
+        // Drag and Drop visual feedback
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-primary', 'bg-surface-container-high');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-primary', 'bg-surface-container-high');
+            }, false);
+        });
+    </script>
+</body></html>

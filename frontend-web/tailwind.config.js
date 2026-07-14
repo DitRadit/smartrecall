@@ -1,0 +1,90 @@
+/**
+ * tailwind.config.js - Design tokens diambil dari docs/design/DESIGN.md
+ * (export Stitch "Contextual Learning Guide" untuk SmartRecall).
+ *
+ * fontFamily fallback ke system font stack supaya UI tetap rapi kalau
+ * Google Fonts (Be Vietnam Pro) gagal dimuat karena offline/koneksi lambat
+ * -- sesuai prinsip offline-first produk ini (ARCHITECTURE.md prinsip #1-2).
+ */
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  theme: {
+    extend: {
+      colors: {
+        'surface-dim': '#cbdbf5',
+        'primary-fixed-dim': '#adc8f5',
+        'on-secondary-fixed': '#2a1700',
+        'inverse-primary': '#adc8f5',
+        primary: '#022448',
+        'error-container': '#ffdad6',
+        'on-tertiary-fixed-variant': '#005236',
+        'secondary-fixed-dim': '#ffb95f',
+        'tertiary-container': '#00422b',
+        'surface-container-low': '#eff4ff',
+        'on-tertiary-container': '#10b981',
+        'primary-fixed': '#d5e3ff',
+        error: '#ba1a1a',
+        'surface-container-high': '#dce9ff',
+        'on-primary-fixed': '#001c3b',
+        'on-secondary-fixed-variant': '#653e00',
+        'on-primary': '#ffffff',
+        'tertiary-fixed-dim': '#4edea3',
+        'tertiary-fixed': '#6ffbbe',
+        'inverse-on-surface': '#eaf1ff',
+        'surface-variant': '#d3e4fe',
+        'on-primary-container': '#8aa4cf',
+        'on-surface-variant': '#43474e',
+        'on-secondary': '#ffffff',
+        background: '#f8f9ff',
+        'surface-container': '#e5eeff',
+        'surface-bright': '#f8f9ff',
+        'surface-tint': '#455f87',
+        'primary-container': '#1e3a5f',
+        'on-background': '#0b1c30',
+        'surface-container-highest': '#d3e4fe',
+        'surface-container-lowest': '#ffffff',
+        outline: '#74777f',
+        'on-error': '#ffffff',
+        'on-secondary-container': '#684000',
+        'secondary-container': '#fea619',
+        surface: '#f8f9ff',
+        'on-error-container': '#93000a',
+        secondary: '#855300',
+        'outline-variant': '#c4c6cf',
+        'inverse-surface': '#213145',
+        tertiary: '#002a1a',
+        'on-tertiary': '#ffffff',
+        'on-surface': '#0b1c30',
+      },
+      fontFamily: {
+        sans: ['"Be Vietnam Pro"', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
+      fontSize: {
+        'headline-lg': ['32px', { lineHeight: '40px', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'headline-lg-mobile': ['24px', { lineHeight: '32px', fontWeight: '700' }],
+        'headline-md': ['20px', { lineHeight: '28px', fontWeight: '600' }],
+        'body-lg': ['18px', { lineHeight: '30px', fontWeight: '400' }],
+        'body-md': ['16px', { lineHeight: '26px', fontWeight: '400' }],
+        'label-md': ['14px', { lineHeight: '20px', letterSpacing: '0.01em', fontWeight: '600' }],
+        'label-sm': ['12px', { lineHeight: '16px', fontWeight: '500' }],
+      },
+      borderRadius: {
+        sm: '0.25rem',
+        DEFAULT: '0.5rem',
+        md: '0.75rem',
+        lg: '1rem',
+        xl: '1.5rem',
+      },
+      spacing: {
+        base: '8px',
+        'container-padding': '20px',
+        gutter: '16px',
+        'touch-target-min': '48px',
+        'stack-sm': '12px',
+        'stack-md': '24px',
+        'stack-lg': '40px',
+      },
+    },
+  },
+  plugins: [],
+};

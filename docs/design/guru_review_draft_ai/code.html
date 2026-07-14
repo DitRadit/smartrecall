@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html class="light" lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SmartRecall - Guru Review Draft AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-dim": "#cbdbf5",
+                    "primary-fixed-dim": "#adc8f5",
+                    "on-secondary-fixed": "#2a1700",
+                    "inverse-primary": "#adc8f5",
+                    "primary": "#022448",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#005236",
+                    "secondary-fixed-dim": "#ffb95f",
+                    "tertiary-container": "#00422b",
+                    "surface-container-low": "#eff4ff",
+                    "on-tertiary-container": "#10b981",
+                    "primary-fixed": "#d5e3ff",
+                    "error": "#ba1a1a",
+                    "surface-container-high": "#dce9ff",
+                    "on-primary-fixed": "#001c3b",
+                    "on-secondary-fixed-variant": "#653e00",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed-dim": "#4edea3",
+                    "tertiary-fixed": "#6ffbbe",
+                    "inverse-on-surface": "#eaf1ff",
+                    "surface-variant": "#d3e4fe",
+                    "on-primary-container": "#8aa4cf",
+                    "on-surface-variant": "#43474e",
+                    "on-secondary": "#ffffff",
+                    "background": "#f8f9ff",
+                    "surface-container": "#e5eeff",
+                    "surface-bright": "#f8f9ff",
+                    "surface-tint": "#455f87",
+                    "primary-container": "#1e3a5f",
+                    "on-background": "#0b1c30",
+                    "surface-container-highest": "#d3e4fe",
+                    "outline": "#74777f",
+                    "on-error": "#ffffff",
+                    "on-secondary-container": "#684000",
+                    "secondary-container": "#fea619",
+                    "surface": "#f8f9ff",
+                    "on-error-container": "#93000a",
+                    "secondary": "#855300",
+                    "outline-variant": "#c4c6cf",
+                    "inverse-surface": "#213145",
+                    "on-tertiary": "#ffffff",
+                    "on-tertiary-fixed": "#002113",
+                    "on-primary-fixed-variant": "#2d486d",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#0b1c30",
+                    "secondary-fixed": "#ffddb8",
+                    "tertiary": "#002a1a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "touch-target-min": "48px",
+                    "stack-sm": "12px",
+                    "container-padding": "20px",
+                    "gutter": "16px",
+                    "base": "8px",
+                    "stack-md": "24px",
+                    "stack-lg": "40px"
+            },
+            "fontFamily": {
+                    "label-md": ["Be Vietnam Pro"],
+                    "label-sm": ["Be Vietnam Pro"],
+                    "body-md": ["Be Vietnam Pro"],
+                    "body-lg": ["Be Vietnam Pro"],
+                    "headline-lg-mobile": ["Be Vietnam Pro"],
+                    "headline-lg": ["Be Vietnam Pro"],
+                    "headline-md": ["Be Vietnam Pro"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "26px", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "30px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #f8f9ff; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c4c6cf; border-radius: 10px; }
+        .card-draft { transition: all 0.2s ease; border-left: 4px solid transparent; }
+        .card-draft:hover { transform: translateX(4px); }
+        .card-approved { border-left-color: #10b981; background-color: #f0fdf4; }
+        .card-rejected { border-left-color: #ba1a1a; opacity: 0.6; }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- Top Navigation Shell (TopAppBar) -->
+<header class="bg-surface border-b border-outline-variant w-full top-0 z-50 sticky">
+<div class="flex justify-between items-center px-container-padding h-touch-target-min w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-base">
+<span class="material-symbols-outlined text-primary text-headline-md" data-icon="school">school</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">SmartRecall</h1>
+</div>
+<div class="flex items-center gap-gutter">
+<div class="hidden md:flex gap-base">
+<button class="text-primary font-bold px-4 py-2 hover:bg-surface-container-high transition-colors rounded-full font-label-md text-label-md">Materi Saya</button>
+<button class="text-on-surface-variant px-4 py-2 hover:bg-surface-container-high transition-colors rounded-full font-label-md text-label-md">Statistik</button>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-container overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a friendly Southeast Asian teacher in a bright, modern office setting. She is wearing a smart-casual navy blazer over a white shirt. The background is softly blurred with bookshelves and a warm, natural light coming from a large window. High-key lighting, corporate modernism style, clean and encouraging atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCP4meJUTWAyDbYTTlWLBqRGxELwsH5CkCP_KsdratbekP1_AO2_Q-0kD8xiUz6NUSpXuG-EXx880wgTj4I8XDh0IoTaiz2BzoKZ0pIxDJq08jg3epMK1LPiOV7a1m3k0_IUBETHnFe1V8_dEjaXqwGmYIrYks2VPjCLognyp1zG9fabm93qw7WAdqGxw6eEhnN0MZSheQtA3Q3vtwzdeLs51BQtR_Y7ibHR6mdR3OX30ksesURIhc"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex flex-col md:flex-row h-[calc(100vh-48px)] overflow-hidden">
+<!-- Sidebar Navigation (NavigationDrawer) -->
+<aside class="hidden md:flex flex-col gap-base p-gutter w-64 bg-surface-container-lowest border-r border-outline-variant">
+<h2 class="font-headline-md text-headline-md text-primary px-4 py-2">Guru Dashboard</h2>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="bg-secondary-container text-on-secondary-container rounded-full px-4 py-3 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-label-md text-label-md">Materi Saya</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-container-high rounded-full px-4 py-3 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="cloud_upload">cloud_upload</span>
+<span class="font-label-md text-label-md">Upload</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-container-high rounded-full px-4 py-3 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-label-md text-label-md">Statistik</span>
+</a>
+</nav>
+</aside>
+<!-- Dynamic Content Canvas -->
+<section class="flex-1 flex flex-col relative overflow-hidden bg-background">
+<!-- Draft Status Banner (TopAppBar Alt Type) -->
+<div class="w-full flex items-center justify-between py-3 px-6 gap-2 sticky top-0 z-40 bg-secondary-container">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-secondary-container" data-icon="auto_awesome">auto_awesome</span>
+<div>
+<p class="font-label-md text-label-md font-bold text-on-secondary-container">AI Review Mode: Sejarah Kemerdekaan RI</p>
+<p class="text-xs text-on-secondary-container opacity-80">12 kartu draft ditemukan dari dokumen Anda.</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2 py-1 bg-white/30 rounded text-[10px] font-bold text-on-secondary-container uppercase tracking-wider">Draft #4201</span>
+</div>
+</div>
+<!-- Split View Layout -->
+<div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+<!-- Left: List of AI-generated flashcards -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
+<div class="flex justify-between items-center mb-2">
+<h3 class="font-headline-md text-headline-md text-primary">Daftar Flashcard AI</h3>
+<div class="flex gap-2">
+<button class="text-xs px-3 py-1 border border-outline-variant rounded-full hover:bg-surface-container-high transition-colors font-label-md">Sortir: Terbaru</button>
+</div>
+</div>
+<!-- Flashcard Items -->
+<div class="space-y-4 pb-24" id="flashcard-list">
+<!-- Card 1 -->
+<div class="card-draft bg-white border border-outline-variant rounded-xl p-5 shadow-sm group">
+<div class="flex justify-between items-start mb-3">
+<span class="text-xs font-bold text-primary bg-primary-fixed px-2 py-1 rounded">KARTU 01</span>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 hover:bg-error-container hover:text-error rounded-full transition-colors" onclick="toggleCardStatus(this, 'reject')" title="Reject">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<button class="p-2 hover:bg-tertiary-fixed hover:text-tertiary rounded-full transition-colors" onclick="toggleCardStatus(this, 'approve')" title="Approve">
+<span class="material-symbols-outlined" data-icon="done">done</span>
+</button>
+</div>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-xs font-bold text-outline uppercase mb-1">Pertanyaan</label>
+<textarea class="w-full border-none p-0 focus:ring-0 text-body-md font-body-md text-on-surface bg-transparent resize-none overflow-hidden" rows="2">Kapan Proklamasi Kemerdekaan Indonesia dikumandangkan?</textarea>
+</div>
+<div class="pt-3 border-t border-outline-variant">
+<label class="block text-xs font-bold text-outline uppercase mb-1">Jawaban</label>
+<textarea class="w-full border-none p-0 focus:ring-0 text-body-md font-body-md text-on-surface-variant bg-transparent resize-none overflow-hidden" rows="2">17 Agustus 1945 oleh Soekarno dan Hatta di Jalan Pegangsaan Timur No. 56, Jakarta.</textarea>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="card-draft bg-white border border-outline-variant rounded-xl p-5 shadow-sm group">
+<div class="flex justify-between items-start mb-3">
+<span class="text-xs font-bold text-primary bg-primary-fixed px-2 py-1 rounded">KARTU 02</span>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 hover:bg-error-container hover:text-error rounded-full transition-colors" onclick="toggleCardStatus(this, 'reject')">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<button class="p-2 hover:bg-tertiary-fixed hover:text-tertiary rounded-full transition-colors" onclick="toggleCardStatus(this, 'approve')">
+<span class="material-symbols-outlined" data-icon="done">done</span>
+</button>
+</div>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-xs font-bold text-outline uppercase mb-1">Pertanyaan</label>
+<textarea class="w-full border-none p-0 focus:ring-0 text-body-md font-body-md text-on-surface bg-transparent resize-none overflow-hidden" rows="2">Siapa yang menjahit Bendera Pusaka Sang Saka Merah Putih?</textarea>
+</div>
+<div class="pt-3 border-t border-outline-variant">
+<label class="block text-xs font-bold text-outline uppercase mb-1">Jawaban</label>
+<textarea class="w-full border-none p-0 focus:ring-0 text-body-md font-body-md text-on-surface-variant bg-transparent resize-none overflow-hidden" rows="2">Ibu Fatmawati, istri dari Presiden pertama RI, Soekarno.</textarea>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="card-draft bg-white border border-outline-variant rounded-xl p-5 shadow-sm group">
+<div class="flex justify-between items-start mb-3">
+<span class="text-xs font-bold text-primary bg-primary-fixed px-2 py-1 rounded">KARTU 03</span>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 hover:bg-error-container hover:text-error rounded-full transition-colors" onclick="toggleCardStatus(this, 'reject')">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<button class="p-2 hover:bg-tertiary-fixed hover:text-tertiary rounded-full transition-colors" onclick="toggleCardStatus(this, 'approve')">
+<span class="material-symbols-outlined" data-icon="done">done</span>
+</button>
+</div>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-xs font-bold text-outline uppercase mb-1">Pertanyaan</label>
+<textarea class="w-full border-none p-0 focus:ring-0 text-body-md font-body-md text-on-surface bg-transparent resize-none overflow-hidden" rows="2">Tujuan utama dari peristiwa Rengasdengklok adalah?</textarea>
+</div>
+<div class="pt-3 border-t border-outline-variant">
+<label class="block text-xs font-bold text-outline uppercase mb-1">Jawaban</label>
+<textarea class="w-full border-none p-0 focus:ring-0 text-body-md font-body-md text-on-surface-variant bg-transparent resize-none overflow-hidden" rows="2">Mendesak Soekarno dan Hatta agar segera memproklamasikan kemerdekaan tanpa pengaruh Jepang.</textarea>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Manual Add Card Form -->
+<aside class="w-full lg:w-96 bg-surface-container-low border-l border-outline-variant p-6 overflow-y-auto">
+<div class="sticky top-0">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-secondary" data-icon="add_circle">add_circle</span>
+<h3 class="font-headline-md text-headline-md text-primary">Tambah Manual</h3>
+</div>
+<div class="bg-white rounded-xl border border-outline-variant p-5 shadow-sm">
+<div class="mb-4">
+<label class="block text-sm font-bold text-on-surface-variant mb-2">Pertanyaan</label>
+<textarea class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md p-3 min-h-[100px]" placeholder="Masukkan pertanyaan baru..."></textarea>
+</div>
+<div class="mb-6">
+<label class="block text-sm font-bold text-on-surface-variant mb-2">Jawaban</label>
+<textarea class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-body-md font-body-md p-3 min-h-[100px]" placeholder="Masukkan jawaban yang benar..."></textarea>
+</div>
+<button class="w-full py-4 bg-primary text-white font-bold rounded-full hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="save">save</span>
+<span>Simpan Draft Baru</span>
+</button>
+</div>
+<!-- Statistics Card -->
+<div class="mt-8 bg-primary-container/20 rounded-xl border border-primary-fixed p-4">
+<h4 class="text-xs font-bold text-primary uppercase mb-3">Ringkasan Sesi</h4>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-white/50 p-3 rounded-lg text-center">
+<p class="text-2xl font-bold text-primary">12</p>
+<p class="text-[10px] text-outline-variant font-bold uppercase">Total</p>
+</div>
+<div class="bg-tertiary-fixed/30 p-3 rounded-lg text-center">
+<p class="text-2xl font-bold text-tertiary" id="approved-count">0</p>
+<p class="text-[10px] text-on-tertiary-fixed-variant font-bold uppercase">Disetujui</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+<!-- Bottom Floating Bar -->
+<div class="fixed bottom-6 left-1/2 -translate-x-1/2 md:left-[calc(50%+128px)] -translate-x-1/2 w-[90%] max-w-2xl bg-white/80 backdrop-blur-md border border-outline-variant shadow-lg rounded-full py-3 px-6 flex items-center justify-between z-50">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold text-outline uppercase leading-tight">Progres Review</span>
+<div class="flex items-center gap-2">
+<div class="w-32 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary transition-all duration-500 w-0" id="progress-bar"></div>
+</div>
+<span class="text-xs font-bold text-primary" id="progress-text">0%</span>
+</div>
+</div>
+<button class="bg-secondary-container text-on-secondary-container px-8 py-3 rounded-full font-bold hover:shadow-md active:scale-95 transition-all flex items-center gap-2 text-sm md:text-base" onclick="publishAll()">
+<span class="material-symbols-outlined" data-icon="publish">publish</span>
+                    Approve Semua &amp; Publish
+                </button>
+</div>
+</section>
+</main>
+<!-- Mobile Bottom Navigation (BottomNavBar) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 bg-surface border-t border-outline-variant z-[60]">
+<button class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-xl px-6 py-1">
+<span class="material-symbols-outlined" data-icon="local_library">local_library</span>
+<span class="font-label-sm text-label-sm">Belajar</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm">Profil</span>
+</button>
+</nav>
+<script>
+        let approvedCount = 0;
+        const totalCards = 12;
+
+        function toggleCardStatus(btn, status) {
+            const card = btn.closest('.card-draft');
+            
+            if (status === 'approve') {
+                if (!card.classList.contains('card-approved')) {
+                    card.classList.remove('card-rejected');
+                    card.classList.add('card-approved');
+                    approvedCount++;
+                } else {
+                    card.classList.remove('card-approved');
+                    approvedCount--;
+                }
+            } else if (status === 'reject') {
+                if (card.classList.contains('card-approved')) {
+                    approvedCount--;
+                }
+                card.classList.remove('card-approved');
+                card.classList.toggle('card-rejected');
+            }
+            
+            updateProgress();
+        }
+
+        function updateProgress() {
+            document.getElementById('approved-count').innerText = approvedCount;
+            const percentage = Math.round((approvedCount / totalCards) * 100);
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+            document.getElementById('progress-text').innerText = `${percentage}%`;
+        }
+
+        function publishAll() {
+            const btn = event.currentTarget;
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin" data-icon="sync">sync</span> Menyimpan...';
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            setTimeout(() => {
+                alert('Materi berhasil dipublish ke perpustakaan siswa!');
+                btn.innerHTML = '<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span> Selesai';
+            }, 1500);
+        }
+
+        // Auto-resize textareas
+        document.querySelectorAll('textarea').forEach(el => {
+            el.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
+            // Trigger initial height
+            el.style.height = (el.scrollHeight) + 'px';
+        });
+    </script>
+</body></html>

@@ -1,0 +1,58 @@
+# docker-compose.yml (opsional)
+#
+# Menjalankan ai-service, backend-api, frontend-web sekaligus sebagai
+# simulasi 1 "Local Server Hub" (PRD.md bagian 15.4 Demo Environment).
+#
+# PENTING: Sebelum menjalankan `docker compose up`, buat file .env di masing-masing
+# folder service dari .env.example (lihat README.md). docker-compose ini
+# membaca env var dari file .env di tiap folder service.
+
+version: '3.9'
+
+services:
+  ai-service:
+    build: ./ai-service
+    container_name: smartrecall-ai-service
+    env_file:
+      - ./ai-service/.env
+    ports:
+      - '5001:5001'
+    volumes:
+      - ./ai-service/uploads:/app/uploads
+    networks:
+      - smartrecall-net
+    restart: unless-stopped
+
+  backend-api:
+    build: ./backend-api
+    container_name: smartrecall-backend-api
+    env_file:
+      - ./backend-api/.env
+    environment:
+      - AI_SERVICE_URL=http://ai-service:5001
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./backend-api/prisma/database:/app/prisma/database
+    depends_on:
+      - ai-service
+    networks:
+      - smartrecall-net
+    restart: unless-stopped
+
+  frontend-web:
+    build: ./frontend-web
+    container_name: smartrecall-frontend-web
+    environment:
+      - VITE_BACKEND_API_URL=http://localhost:3000
+    ports:
+      - '5173:5173'
+    depends_on:
+      - backend-api
+    networks:
+      - smartrecall-net
+    restart: unless-stopped
+
+networks:
+  smartrecall-net:
+    driver: bridge

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+
+<html class="light" lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Guru Dashboard - SmartRecall</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            background-color: #f8f9ff;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#cbdbf5",
+                        "primary-fixed-dim": "#adc8f5",
+                        "on-secondary-fixed": "#2a1700",
+                        "inverse-primary": "#adc8f5",
+                        "primary": "#022448",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "secondary-fixed-dim": "#ffb95f",
+                        "tertiary-container": "#00422b",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-container": "#10b981",
+                        "primary-fixed": "#d5e3ff",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#dce9ff",
+                        "on-primary-fixed": "#001c3b",
+                        "on-secondary-fixed-variant": "#653e00",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "tertiary-fixed": "#6ffbbe",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-variant": "#d3e4fe",
+                        "on-primary-container": "#8aa4cf",
+                        "on-surface-variant": "#43474e",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "surface-container": "#e5eeff",
+                        "surface-bright": "#f8f9ff",
+                        "surface-tint": "#455f87",
+                        "primary-container": "#1e3a5f",
+                        "on-background": "#0b1c30",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline": "#74777f",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#684000",
+                        "secondary-container": "#fea619",
+                        "surface": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "secondary": "#855300",
+                        "outline-variant": "#c4c6cf",
+                        "inverse-surface": "#213145",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#002113",
+                        "on-primary-fixed-variant": "#2d486d",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#0b1c30",
+                        "secondary-fixed": "#ffddb8",
+                        "tertiary": "#002a1a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "touch-target-min": "48px",
+                        "stack-sm": "12px",
+                        "container-padding": "20px",
+                        "gutter": "16px",
+                        "base": "8px",
+                        "stack-md": "24px",
+                        "stack-lg": "40px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Be Vietnam Pro"],
+                        "label-sm": ["Be Vietnam Pro"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "headline-lg": ["Be Vietnam Pro"],
+                        "headline-md": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "26px", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "30px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface">
+<!-- Sidebar / NavigationDrawer -->
+<aside class="hidden md:flex flex-col gap-base p-gutter h-full w-64 fixed left-0 top-0 bg-surface-container-lowest border-r border-outline-variant z-30">
+<div class="mb-stack-lg px-4 pt-4 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="school">school</span>
+<h1 class="font-headline-md text-headline-md text-primary font-bold">SmartRecall</h1>
+</div>
+<nav class="flex flex-col gap-2">
+<!-- Materi Saya is Active -->
+<a class="bg-secondary-container text-on-secondary-container rounded-full px-4 py-3 flex items-center gap-3 transition-all duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-label-md text-label-md">Materi Saya</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-container-high rounded-full px-4 py-3 flex items-center gap-3 transition-all duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="cloud_upload">cloud_upload</span>
+<span class="font-label-md text-label-md">Upload</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-container-high rounded-full px-4 py-3 flex items-center gap-3 transition-all duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-label-md text-label-md">Statistik</span>
+</a>
+</nav>
+<div class="mt-auto p-4 border-t border-outline-variant">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-white font-bold">
+                    B
+                </div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Bapak Guru</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider font-bold">Administrator</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 min-h-screen transition-all duration-300">
+<!-- Offline Mode Banner (TopAppBar secondary) -->
+<div class="w-full flex items-center justify-center py-2 px-4 gap-2 sticky top-0 z-40 bg-secondary-container text-on-secondary-container font-label-md text-label-md border-b border-outline-variant">
+<span class="material-symbols-outlined" data-icon="cloud_off">cloud_off</span>
+<span>Offline Mode: Data akan disinkronisasi saat kembali online</span>
+</div>
+<!-- Top Header Area -->
+<header class="flex justify-between items-center px-container-padding py-stack-md max-w-7xl mx-auto">
+<div class="flex flex-col">
+<h2 class="font-headline-lg text-headline-lg text-primary">Materi Saya</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Kelola konten edukasi untuk siswa Anda.</p>
+</div>
+<button class="bg-primary text-on-primary h-touch-target-min px-6 rounded-xl flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+<span class="font-label-md text-label-md">+ Upload Materi Baru</span>
+</button>
+</header>
+<!-- Stats Section (Bento Style) -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-gutter px-container-padding max-w-7xl mx-auto mb-stack-md">
+<!-- Total Materi Card -->
+<div class="bg-surface-container-lowest border border-outline-variant p-stack-md rounded-xl flex flex-col gap-2 group transition-all hover:border-primary">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">Total Materi</span>
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" data-icon="book">book</span>
+</div>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-bold text-primary">42</span>
+<span class="text-on-tertiary-container font-label-sm text-label-sm flex items-center">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_upward">arrow_upward</span>
+                        12% bulan ini
+                    </span>
+</div>
+</div>
+<!-- Siswa Aktif Card -->
+<div class="bg-surface-container-lowest border border-outline-variant p-stack-md rounded-xl flex flex-col gap-2 group transition-all hover:border-secondary">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">Siswa Aktif</span>
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+</div>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-bold text-primary">156</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">Dari 3 kelas</span>
+</div>
+</div>
+</section>
+<!-- Table Container -->
+<section class="px-container-padding max-w-7xl mx-auto mb-stack-lg">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low border-b border-outline-variant">
+<tr>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant">Judul Materi</th>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant">Tanggal</th>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant">Status</th>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant text-right">Aksi</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="A clean educational illustration for a biology lesson about the human respiratory system. The graphic features simplified anatomical diagrams in a soft navy and white palette with amber highlights for key parts. Minimalist digital art style suitable for a modern learning dashboard interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBN4lWD1XAnuYcgCaTk8ec4Qqxx0SB067xIk3XzCeS7LY3Ker5rcEcbJ9HibzMZ5anMvvzwHvpsMK1dcrWlsJKESDLE-ELId7qasW6EuafYL6_HZOp18LR9K9Hc9BQoDtSiGcH2ioDV0verr3a7koXGGrj5wC6TY04eUtHSGU1__8TWK5qvi0WE6GQUpQ-_YTNHSPltUJqTEiaov7II22LbhIQDhnQKoSsHlzLAdwMX5qeDM9NUv20"/>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Sistem Pernapasan Manusia</p>
+<p class="text-label-sm text-label-sm text-on-surface-variant">Biologi • Kelas 8</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md text-body-md text-on-surface-variant">24 Okt 2023</td>
+<td class="px-6 py-4">
+<span class="bg-on-tertiary-container/10 text-on-tertiary-container px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Published</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-on-surface-variant hover:text-primary p-2">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="text-on-surface-variant hover:text-error p-2">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="A simple geometric artwork representing mathematical concepts of trigonometry. The design uses crisp lines and high-contrast navy blue and amber accents against a soft off-white background. The visual is designed for an educational platform focusing on clarity and low-bandwidth accessibility." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7SRLisSfSEoayWj0Beku8Toq84aenikZirrJCmAG2kVHu9Qx9l1SRJ1I8ZsAbsoivLHtWO3K3_lbl6gXwGI-qOFlJm0aGKgWUbx6goplt4t5G4BpQxPeyxubbKHOHArzBr2WVQmH20rBQSHBm-qNZEzKCDkPcc8oh-w3UOMYvx6rcvRlpqyOp6hHcHRsgcEd3TrjKVYB9zTSXy3WRBTN3XGKFmobuLiHFkgsQoz9egk7U7PoIMRI"/>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Dasar-dasar Trigonometri</p>
+<p class="text-label-sm text-label-sm text-on-surface-variant">Matematika • Kelas 10</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md text-body-md text-on-surface-variant">22 Okt 2023</td>
+<td class="px-6 py-4">
+<span class="bg-secondary-container/20 text-on-secondary-container px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Draft</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-on-surface-variant hover:text-primary p-2">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="text-on-surface-variant hover:text-error p-2">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="A stylized digital map of Southeast Asia featuring key historical landmarks in a minimalist flat design. The color scheme is dominated by corporate navy blue with subtle green and amber markers. High contrast and clean line work ensure readability for students in various lighting conditions." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkDQB5zCHXM-Wi62mr0vji_YXYlciKXLZTYV3IXjmFpp5rw-k1RiEhRETskSIGGikQhcU4-AF2M5J_yUucMQhRlNP8JuSNwD-pZZ8n0FdGvhbfUdoQVAyEMNHaZQnFL0cifeNNtHuyLGjABibb_Ac7BDKk4V_G69vqvhE5OAATqEAbk1ep9kUI84eziygMqJN6Ox9WJ7DpjvwkguooUN2ODmaGG2uGnf-LoRKsRUGG4-5wq2uW3lM"/>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Sejarah Kerajaan Majapahit</p>
+<p class="text-label-sm text-label-sm text-on-surface-variant">Sejarah • Kelas 7</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md text-body-md text-on-surface-variant">15 Okt 2023</td>
+<td class="px-6 py-4">
+<span class="bg-on-tertiary-container/10 text-on-tertiary-container px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Published</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-on-surface-variant hover:text-primary p-2">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="text-on-surface-variant hover:text-error p-2">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="image">image</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Hukum Newton I, II, dan III</p>
+<p class="text-label-sm text-label-sm text-on-surface-variant">Fisika • Kelas 8</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md text-body-md text-on-surface-variant">10 Okt 2023</td>
+<td class="px-6 py-4">
+<span class="bg-outline-variant/30 text-outline px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Draft</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-on-surface-variant hover:text-primary p-2">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+</button>
+<button class="text-on-surface-variant hover:text-error p-2">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-6 py-4 border-t border-outline-variant flex items-center justify-between">
+<p class="text-label-sm text-label-sm text-on-surface-variant">Menampilkan 1-4 dari 42 materi</p>
+<div class="flex gap-2">
+<button class="p-2 rounded-lg border border-outline-variant hover:bg-surface-container disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="p-2 rounded-lg border border-outline-variant hover:bg-surface-container">
+<span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar for Mobile View (Auto Switch) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 bg-surface border-t border-outline-variant z-50 shadow-sm">
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-xl px-6 py-1 transition-transform active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="local_library">local_library</span>
+<span class="font-label-sm text-label-sm">Belajar</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant active:bg-surface-container-high transition-transform active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm">Profil</span>
+</a>
+</nav>
+<!-- Task-focused Close/Back suppression: No FAB here as per rule on Transactional/Details -->
+<script>
+        // Simple logic for table row hover states if needed, though Tailwind handled most
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('click', () => {
+                // Future: Navigate to detail
+                console.log('Navigate to material detail');
+            });
+            row.classList.add('cursor-pointer');
+        });
+
+        // Simulating Sync Toast
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-20 md:bottom-10 right-10 bg-on-tertiary-container text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 transform translate-y-20 transition-transform duration-500 z-[100]';
+                toast.innerHTML = `<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span> <span class="font-label-md">Sincronisasi Berhasil</span>`;
+                document.body.appendChild(toast);
+                
+                requestAnimationFrame(() => {
+                    toast.classList.remove('translate-y-20');
+                });
+
+                setTimeout(() => {
+                    toast.classList.add('translate-y-20');
+                    setTimeout(() => toast.remove(), 500);
+                }, 3000);
+            }, 2000);
+        });
+    </script>
+</body></html>

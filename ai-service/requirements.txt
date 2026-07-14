@@ -1,0 +1,11 @@
+Flask==3.0.3
+Flask-CORS==4.0.1
+python-dotenv==1.0.1
+pdfplumber==0.11.4
+Sastrawi==1.0.1
+openai==1.54.4
+requests==2.32.3
+gunicorn==22.0.0
+
+# Dev/testing
+pytest==8.3.3
