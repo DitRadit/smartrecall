@@ -6,7 +6,7 @@ bagian 6: frontend-web TIDAK BOLEH memanggil ai-service secara langsung).
 
 Alur (ARCHITECTURE.md bagian 3.1):
   backend-api -> POST /generate/materi (file PDF + jenis_konten)
-  ai-service: pdfplumber ekstrak teks -> Sastrawi preprocess -> NVIDIA NIM API
+  ai-service: pdfplumber ekstrak teks -> Sastrawi preprocess -> Gemini API
   ai-service kembalikan hasil draft ke backend-api
 """
 
@@ -94,7 +94,7 @@ def generate_materi():
         errors = {}
 
         # Ketiga jenis konten independen satu sama lain (masing-masing 1 HTTP call
-        # terpisah ke NVIDIA NIM), jadi dijalankan PARALEL, bukan berurutan --
+        # terpisah ke Gemini), jadi dijalankan PARALEL, bukan berurutan --
         # supaya total waktu tunggu backend-api (AI_SERVICE_TIMEOUT_MS) tidak
         # gampang kelewat untuk materi yang panjang (3x waktu 1 panggilan LLM
         # kalau sekuensial, vs ~1x waktu panggilan terlama kalau paralel).
@@ -116,7 +116,7 @@ def generate_materi():
                     draft[jk] = None
                     errors[jk] = str(e)
 
-        # Kalau SEMUA jenis gagal (mis. NIM API down total), anggap request
+        # Kalau SEMUA jenis gagal (mis. Gemini API down total), anggap request
         # gagal supaya backend-api mengarahkan guru ke fallback manual (FR-7).
         if all(v is None for v in draft.values()):
             raise NIMAPIError(errors.get(jenis_list[0], "Gagal generate semua jenis konten."))
@@ -136,7 +136,7 @@ def generate_materi():
         return jsonify({"status": "error", "message": str(e)}), 422
 
     except NIMAPIError as e:
-        logger.error("NVIDIA NIM API error: %s", e)
+        logger.error("Gemini API error: %s", e)
         # 503: guru harus diarahkan ke fallback input manual (FR-7) oleh backend-api.
         return jsonify({"status": "error", "message": str(e)}), 503
 

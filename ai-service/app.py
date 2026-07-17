@@ -4,13 +4,13 @@ SmartRecall - ai-service (Flask)
 Tanggung jawab (lih. ARCHITECTURE.md bagian 2):
 - Ekstraksi teks PDF (pdfplumber)
 - Preprocessing NLP Bahasa Indonesia (Sastrawi)
-- Generate flashcard/rangkuman/soal via NVIDIA NIM API
+- Generate flashcard/rangkuman/soal via Gemini API
 
 PENTING (ARCHITECTURE.md bagian 6 & 8):
 - Ini satu-satunya service yang boleh butuh koneksi internet (saat generate).
 - Service ini TIDAK BOLEH diakses langsung oleh frontend-web.
   Hanya backend-api yang boleh memanggil endpoint di sini.
-- API key NVIDIA NIM wajib lewat environment variable, jangan pernah hardcode.
+- API key Gemini wajib lewat environment variable, jangan pernah hardcode.
 """
 
 import os

@@ -1,8 +1,8 @@
 """
-nim_client.py - Wrapper untuk memanggil NVIDIA NIM API (Llama 3.1 8B Instruct).
+nim_client.py - Wrapper untuk memanggil Gemini API.
 
 PENTING (ARCHITECTURE.md bagian 7 & 8):
-- API key WAJIB diambil dari environment variable (NIM_API_KEY), jangan hardcode.
+- API key WAJIB diambil dari environment variable (GEMINI_API_KEY), jangan hardcode.
 - Ini adalah satu-satunya titik yang butuh koneksi internet aktif di seluruh sistem.
 - Retry sederhana disediakan di sini, tapi kontrol rate-limit/queue utama tetap
   berada di backend-api (batch generate), sesuai prinsip "satu tempat kontrol".
@@ -18,20 +18,20 @@ logger = logging.getLogger("ai-service.nim_client")
 
 
 class NIMAPIError(Exception):
-    """Dilempar saat NVIDIA NIM API gagal dipanggil (network error, rate limit, response invalid)."""
+    """Dilempar saat Gemini API gagal dipanggil (network error, rate limit, response invalid)."""
     pass
 
 
 def _get_config():
-    api_key = os.getenv("NIM_API_KEY")
-    base_url = os.getenv("NIM_API_BASE_URL", "https://integrate.api.nvidia.com/v1")
-    model = os.getenv("NIM_MODEL_NAME", "meta/llama-3.1-8b-instruct")
-    timeout = int(os.getenv("NIM_REQUEST_TIMEOUT_SECONDS", "60"))
-    max_retries = int(os.getenv("NIM_MAX_RETRIES", "2"))
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("NIM_API_KEY")
+    base_url = os.getenv("GEMINI_API_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
+    model = os.getenv("GEMINI_MODEL_NAME", "gemini-flash-latest")
+    timeout = int(os.getenv("GEMINI_REQUEST_TIMEOUT_SECONDS", os.getenv("NIM_REQUEST_TIMEOUT_SECONDS", "60")))
+    max_retries = int(os.getenv("GEMINI_MAX_RETRIES", os.getenv("NIM_MAX_RETRIES", "2")))
 
     if not api_key:
         raise NIMAPIError(
-            "NIM_API_KEY tidak ditemukan di environment variable. "
+            "GEMINI_API_KEY tidak ditemukan di environment variable. "
             "Set di file .env (lihat .env.example), jangan hardcode di source code."
         )
 
@@ -122,7 +122,7 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
 
 def generate_content(materi_text: str, jenis_konten: str) -> dict:
     """
-    Memanggil NVIDIA NIM API untuk menghasilkan konten (flashcard/rangkuman/soal).
+    Memanggil Gemini API untuk menghasilkan konten (flashcard/rangkuman/soal).
 
     Args:
         materi_text: teks materi yang sudah dipreprocess (lihat nlp_processor.py)
@@ -135,11 +135,7 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
     config = _get_config()
     prompt = _build_prompt(materi_text, jenis_konten)
 
-    headers = {
-        "Authorization": f"Bearer {config['api_key']}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
     # "soal" pakai temperature lebih rendah dari flashcard/rangkuman: soal (apalagi
     # soal hitung) butuh konsistensi logis, sementara temperature lebih tinggi cuma
@@ -148,53 +144,62 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
     temperature = 0.15 if jenis_konten == "soal" else 0.4
 
     payload = {
-        "model": config["model"],
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": temperature,
-        "max_tokens": 1500,
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": temperature,
+            "maxOutputTokens": 1500,
+        },
     }
 
-    url = f"{config['base_url']}/chat/completions"
+    url = f"{config['base_url']}/models/{config['model']}:generateContent"
+    params = {"key": config["api_key"]}
 
     last_error = None
     for attempt in range(1, config["max_retries"] + 2):  # +2: percobaan awal + retries
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=config["timeout"])
+            response = requests.post(url, headers=headers, params=params, json=payload, timeout=config["timeout"])
 
             if response.status_code == 429:
                 # Rate limited: backoff singkat lalu retry (kontrol utama tetap di backend-api queue)
-                logger.warning("NVIDIA NIM API rate limited (percobaan %s)", attempt)
-                last_error = NIMAPIError("Rate limit tercapai pada NVIDIA NIM API (429).")
+                logger.warning("Gemini API rate limited (percobaan %s)", attempt)
+                last_error = NIMAPIError("Rate limit tercapai pada Gemini API (429).")
                 time.sleep(min(2 ** attempt, 8))
                 continue
 
             response.raise_for_status()
             data = response.json()
 
-            usage = data.get("usage") or None
-            content_str = data["choices"][0]["message"]["content"]
+            usage = data.get("usageMetadata") or None
+            content_str = "".join(
+                part.get("text", "")
+                for part in data["candidates"][0]["content"].get("parts", [])
+            )
+            if not content_str:
+                raise KeyError("candidates[0].content.parts[].text")
             result = _parse_llm_json(content_str, jenis_konten)
             result["token_usage"] = usage  # dipakai caller (routes/generate.py) untuk logging
             return result
 
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code if e.response is not None else 500
-            logger.warning("NVIDIA NIM API mengembalikan HTTP error (percobaan %s): %s", attempt, e)
-            last_error = NIMAPIError(f"Gagal menghubungi NVIDIA NIM API (status {status_code}): {e}")
+            safe_error = str(e).replace(config["api_key"], "[redacted]")
+            logger.warning("Gemini API mengembalikan HTTP error (percobaan %s): %s", attempt, safe_error)
+            last_error = NIMAPIError(f"Gagal menghubungi Gemini API (status {status_code}): {safe_error}")
             if status_code == 429 or status_code >= 500:
                 time.sleep(min(2 ** attempt, 8))
                 continue
             else:
-                raise last_error
+                raise last_error from None
         except requests.exceptions.RequestException as e:
-            logger.warning("Gagal memanggil NVIDIA NIM API (percobaan %s): %s", attempt, e)
-            last_error = NIMAPIError(f"Gagal menghubungi NVIDIA NIM API: {e}")
+            safe_error = str(e).replace(config["api_key"], "[redacted]")
+            logger.warning("Gagal memanggil Gemini API (percobaan %s): %s", attempt, safe_error)
+            last_error = NIMAPIError(f"Gagal menghubungi Gemini API: {safe_error}")
             time.sleep(min(2 ** attempt, 8))
         except (KeyError, IndexError, json.JSONDecodeError) as e:
-            logger.error("Response NVIDIA NIM API tidak sesuai format yang diharapkan: %s", e)
-            raise NIMAPIError(f"Response NVIDIA NIM API tidak valid: {e}") from e
+            logger.error("Response Gemini API tidak sesuai format yang diharapkan: %s", e)
+            raise NIMAPIError(f"Response Gemini API tidak valid: {e}") from e
 
-    raise last_error or NIMAPIError("Gagal memanggil NVIDIA NIM API setelah beberapa percobaan.")
+    raise (last_error or NIMAPIError("Gagal memanggil Gemini API setelah beberapa percobaan.")) from None
 
 
 def _extract_json_substring(text: str) -> str:

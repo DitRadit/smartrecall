@@ -5,7 +5,7 @@ Fokus utama: memverifikasi bahwa satu kali upload PDF menghasilkan ketiga
 jenis konten sekaligus (flashcard, rangkuman, soal) dalam SATU response,
 tanpa guru perlu memilih jenis konten -- sesuai perubahan alur upload.
 
-NVIDIA NIM API di-mock (monkeypatch generate_content) supaya test tidak
+Gemini API di-mock (monkeypatch generate_content) supaya test tidak
 butuh API key/koneksi internet sungguhan.
 """
 import io
@@ -86,7 +86,7 @@ def test_generate_materi_kegagalan_sebagian_tidak_menggagalkan_seluruh_request(c
 
     def fake_generate_content(materi_text, jenis_konten):
         if jenis_konten == "rangkuman":
-            raise NIMAPIError("Rate limit tercapai pada NVIDIA NIM API (429).")
+            raise NIMAPIError("Rate limit tercapai pada Gemini API (429).")
         return {"parsed": [{"ok": True}], "raw_text": "...", "token_usage": None}
 
     monkeypatch.setattr("routes.generate.generate_content", fake_generate_content)
@@ -106,14 +106,14 @@ def test_generate_materi_kegagalan_sebagian_tidak_menggagalkan_seluruh_request(c
 
 
 def test_generate_materi_semua_jenis_gagal_mengembalikan_503(client, monkeypatch):
-    """Jika NVIDIA NIM API down total (semua jenis gagal), request dianggap gagal
+    """Jika Gemini API down total (semua jenis gagal), request dianggap gagal
     supaya backend-api mengarahkan guru ke fallback input manual (FR-7)."""
     monkeypatch.setattr("routes.generate.extract_text_from_pdf", lambda path: "Materi contoh.")
     monkeypatch.setattr("routes.generate.preprocess_for_generation", lambda text: text)
     monkeypatch.setattr("routes.generate.extract_keywords", lambda text: [])
 
     def fake_generate_content(materi_text, jenis_konten):
-        raise NIMAPIError("Tidak bisa menghubungi NVIDIA NIM API.")
+        raise NIMAPIError("Tidak bisa menghubungi Gemini API.")
 
     monkeypatch.setattr("routes.generate.generate_content", fake_generate_content)
 

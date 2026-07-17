@@ -4,7 +4,7 @@ nlp_processor.py - Preprocessing NLP Bahasa Indonesia menggunakan Sastrawi.
 Tanggung jawab:
 - Membersihkan teks hasil ekstraksi PDF (whitespace, karakter aneh)
 - Stopword removal & stemming ringan sebagai preprocessing sebelum teks
-  dikirim ke NVIDIA NIM API (membantu memangkas token & noise)
+  dikirim ke Gemini API (membantu memangkas token & noise)
 
 Catatan: preprocessing ini TIDAK menggantikan teks asli yang dikirim ke LLM
 untuk generate konten (LLM tetap butuh teks yang natural, bukan hasil stem
@@ -61,7 +61,7 @@ def extract_keywords(text: str, max_keywords: int = 20) -> list[str]:
 
 def preprocess_for_generation(raw_text: str, max_chars: int = 12000) -> str:
     """
-    Preprocessing utama sebelum teks dikirim ke NVIDIA NIM API.
+    Preprocessing utama sebelum teks dikirim ke Gemini API.
     Hanya membersihkan teks & memotong panjang (bukan stemming) supaya
     konteks yang dikirim ke LLM tetap natural dan enak dibaca.
     """
