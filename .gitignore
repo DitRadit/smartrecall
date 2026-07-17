@@ -36,6 +36,8 @@ backend-api/database/*
 !backend-api/database/seeds/seed.js
 backend-api/prisma/database/*
 !backend-api/prisma/database/.gitkeep
+backend-api/generated/ppt/*
+!backend-api/generated/ppt/.gitkeep
 
 # Editor and operating system
 .DS_Store

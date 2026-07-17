@@ -53,6 +53,7 @@ model Materi {
   guru         User         @relation("GuruMateri", fields: [guruId], references: [id])
   judul        String
   fileOriginal String       @map("file_original")
+  pptFile      String?      @map("ppt_file")
   status       String       @default("draft")
   createdAt    DateTime     @default(now()) @map("created_at")
 

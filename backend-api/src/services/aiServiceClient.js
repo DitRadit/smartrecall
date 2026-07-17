@@ -35,10 +35,16 @@ class AIServiceError extends Error {
  *   dipakai kalau hanya ingin (re)generate satu jenis konten saja.
  * @returns {Promise<{ status: string, keywords: string[], draft: { flashcard: object|null, rangkuman: object|null, soal: object|null }, errors?: object }>}
  */
-async function generateMateri(fileBuffer, originalFilename, jenisKonten = 'all') {
+async function generateMateri(fileBuffer, originalFilename, jenisKonten = 'all', options = {}) {
   const form = new FormData();
   form.append('file', fileBuffer, originalFilename);
   form.append('jenis_konten', jenisKonten);
+  if (options.generatePpt) {
+    form.append('generate_ppt', 'true');
+  }
+  if (options.judul) {
+    form.append('judul', options.judul);
+  }
 
   try {
     const response = await axios.post(`${AI_SERVICE_URL}/generate/materi`, form, {

@@ -15,6 +15,7 @@ import api from '../../services/api';
 export default function UploadMateri() {
   const [judul, setJudul] = useState('');
   const [file, setFile] = useState(null);
+  const [generatePpt, setGeneratePpt] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,7 @@ export default function UploadMateri() {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('judul', judul);
+    formData.append('generate_ppt', generatePpt ? 'true' : 'false');
 
     try {
       const response = await api.post('/materi/upload', formData, {
@@ -45,6 +47,7 @@ export default function UploadMateri() {
       setStatus({ type: 'success', message: response.data.message });
       setJudul('');
       setFile(null);
+      setGeneratePpt(false);
     } catch (err) {
       setStatus({
         type: 'error',
@@ -119,13 +122,28 @@ export default function UploadMateri() {
             </p>
           </div>
 
+          <label className="flex items-start gap-3 bg-surface-container-lowest border border-outline-variant rounded-lg p-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={generatePpt}
+              onChange={(e) => setGeneratePpt(e.target.checked)}
+              className="mt-1 w-5 h-5 accent-primary shrink-0"
+            />
+            <span>
+              <span className="block text-label-md text-on-surface">Generate PPT dari materi ini</span>
+              <span className="block text-label-sm text-on-surface-variant mt-1">
+                Opsional. AI akan membuat slide rangkuman dan poin-poin penting memakai template PPT yang sudah disediakan.
+              </span>
+            </span>
+          </label>
+
           <button
             type="submit"
             disabled={loading}
             className="w-full h-touch-target-min bg-primary text-on-primary rounded-xl text-label-md flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
           >
             <span className="material-symbols-outlined">bolt</span>
-            {loading ? 'Mengunggah...' : 'Upload & Generate Semua'}
+            {loading ? 'Mengunggah...' : generatePpt ? 'Upload & Generate Semua + PPT' : 'Upload & Generate Semua'}
           </button>
 
           {status && (

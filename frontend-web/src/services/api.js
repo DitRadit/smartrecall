@@ -8,7 +8,29 @@
 
 import axios from 'axios';
 
-const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:3000';
+function resolveBackendApiUrl() {
+  const configuredUrl = import.meta.env.VITE_BACKEND_API_URL;
+  if (!configuredUrl || typeof window === 'undefined') {
+    return configuredUrl || 'http://localhost:3000';
+  }
+
+  const pageHost = window.location.hostname;
+  const isPageLocalhost = pageHost === 'localhost' || pageHost === '127.0.0.1';
+
+  try {
+    const url = new URL(configuredUrl);
+    const isConfiguredLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (isConfiguredLocalhost && !isPageLocalhost) {
+      return `${url.protocol}//${pageHost}:3000`;
+    }
+  } catch (error) {
+    return configuredUrl;
+  }
+
+  return configuredUrl;
+}
+
+const BACKEND_API_URL = resolveBackendApiUrl();
 
 const api = axios.create({
   baseURL: BACKEND_API_URL,

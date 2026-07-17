@@ -10,6 +10,31 @@
 
 const prisma = require('../config/db');
 const aiServiceClient = require('../services/aiServiceClient');
+const fs = require('fs/promises');
+const path = require('path');
+
+const GENERATED_PPT_DIR = path.join(__dirname, '..', '..', 'generated', 'ppt');
+
+function sanitizeFilename(value) {
+  return String(value || 'materi')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'materi';
+}
+
+async function saveGeneratedPpt(materiId, judul, ppt) {
+  if (!ppt?.content_base64) return null;
+
+  await fs.mkdir(GENERATED_PPT_DIR, { recursive: true });
+  const filename = `${materiId}-${sanitizeFilename(judul)}.pptx`;
+  const fullPath = path.join(GENERATED_PPT_DIR, filename);
+  await fs.writeFile(fullPath, Buffer.from(ppt.content_base64, 'base64'));
+  await prisma.materi.update({
+    where: { id: materiId },
+    data: { pptFile: filename },
+  });
+  return filename;
+}
 
 /**
  * POST /materi/upload
@@ -26,6 +51,7 @@ const aiServiceClient = require('../services/aiServiceClient');
 async function uploadMateri(req, res) {
   try {
     const { judul } = req.body;
+    const generatePpt = ['true', '1', 'yes'].includes(String(req.body.generate_ppt || '').toLowerCase());
     const file = req.file; // dari multer memory storage
 
     if (!file) {
@@ -47,10 +73,12 @@ async function uploadMateri(req, res) {
     // Trigger job generate AI (async, tidak blocking response ke guru).
     // Kegagalan di sini TIDAK mengubah status materi menjadi error yang fatal --
     // guru tetap bisa input manual lewat /flashcard/manual (FR-7).
-    generateAIContentInBackground(materi.id, file.buffer, file.originalname);
+    generateAIContentInBackground(materi.id, file.buffer, file.originalname, { generatePpt, judul });
 
     return res.status(202).json({
-      message: 'Materi diterima, proses generate AI (flashcard, rangkuman, bank soal) berjalan di background.',
+      message: generatePpt
+        ? 'Materi diterima, proses generate AI dan PPT berjalan di background.'
+        : 'Materi diterima, proses generate AI (flashcard, rangkuman, bank soal) berjalan di background.',
       materi: { id: materi.id, judul: materi.judul, status: materi.status },
     });
   } catch (err) {
@@ -67,9 +95,12 @@ async function uploadMateri(req, res) {
  * jenis lain yang berhasil -- guru tetap bisa review yang berhasil &
  * lengkapi manual yang gagal.
  */
-async function generateAIContentInBackground(materiId, fileBuffer, filename) {
+async function generateAIContentInBackground(materiId, fileBuffer, filename, options = {}) {
   try {
-    const result = await aiServiceClient.generateMateri(fileBuffer, filename);
+    const result = await aiServiceClient.generateMateri(fileBuffer, filename, 'all', {
+      generatePpt: Boolean(options.generatePpt),
+      judul: options.judul,
+    });
     const draft = result?.draft;
 
     if (!draft) {
@@ -148,6 +179,14 @@ async function generateAIContentInBackground(materiId, fileBuffer, filename) {
     if (result.errors) {
       console.warn(`[materi ${materiId}] sebagian jenis konten gagal di-generate:`, result.errors);
     }
+    if (result.ppt) {
+      try {
+        const pptFilename = await saveGeneratedPpt(materiId, options.judul || filename, result.ppt);
+        if (pptFilename) savedJenis.push('ppt');
+      } catch (pptErr) {
+        console.warn(`[materi ${materiId}] PPT berhasil dibuat ai-service tapi gagal disimpan backend:`, pptErr.message);
+      }
+    }
     if (failedJenis.length > 0) {
       console.warn(`[materi ${materiId}] sebagian jenis konten gagal disimpan (parsed invalid): ${failedJenis.join(', ')}.`);
     }
@@ -211,6 +250,30 @@ async function getMateriDraft(req, res) {
   } catch (err) {
     console.error('getMateriDraft error:', err);
     return res.status(500).json({ error: 'internal_error', message: 'Gagal mengambil draft materi' });
+  }
+}
+
+async function downloadMateriPpt(req, res) {
+  try {
+    const materiId = parseInt(req.params.id, 10);
+    const materi = await prisma.materi.findFirst({
+      where: { id: materiId, guruId: req.user.id },
+      select: { id: true, judul: true, pptFile: true },
+    });
+
+    if (!materi) {
+      return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
+    }
+    if (!materi.pptFile) {
+      return res.status(404).json({ error: 'not_found', message: 'PPT belum tersedia untuk materi ini' });
+    }
+
+    const fullPath = path.join(GENERATED_PPT_DIR, materi.pptFile);
+    const downloadName = `${sanitizeFilename(materi.judul)}.pptx`;
+    return res.download(fullPath, downloadName);
+  } catch (err) {
+    console.error('downloadMateriPpt error:', err);
+    return res.status(500).json({ error: 'internal_error', message: 'Gagal download PPT' });
   }
 }
 
@@ -298,5 +361,6 @@ module.exports = {
   getMateriDraft,
   approveMateri,
   deleteMateri,
+  downloadMateriPpt,
   generateAIContentInBackground,
 };

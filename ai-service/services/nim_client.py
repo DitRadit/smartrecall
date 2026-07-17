@@ -1,8 +1,8 @@
 """
-nim_client.py - Wrapper untuk memanggil Gemini API.
+nim_client.py - Wrapper untuk memanggil provider LLM (NVIDIA NIM atau Gemini).
 
 PENTING (ARCHITECTURE.md bagian 7 & 8):
-- API key WAJIB diambil dari environment variable (GEMINI_API_KEY), jangan hardcode.
+- API key WAJIB diambil dari environment variable, jangan hardcode.
 - Ini adalah satu-satunya titik yang butuh koneksi internet aktif di seluruh sistem.
 - Retry sederhana disediakan di sini, tapi kontrol rate-limit/queue utama tetap
   berada di backend-api (batch generate), sesuai prinsip "satu tempat kontrol".
@@ -18,29 +18,46 @@ logger = logging.getLogger("ai-service.nim_client")
 
 
 class NIMAPIError(Exception):
-    """Dilempar saat Gemini API gagal dipanggil (network error, rate limit, response invalid)."""
+    """Dilempar saat LLM provider gagal dipanggil (network error, rate limit, response invalid)."""
     pass
 
 
 def _get_config():
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("NIM_API_KEY")
-    base_url = os.getenv("GEMINI_API_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
-    model = os.getenv("GEMINI_MODEL_NAME", "gemini-flash-latest")
-    timeout = int(os.getenv("GEMINI_REQUEST_TIMEOUT_SECONDS", os.getenv("NIM_REQUEST_TIMEOUT_SECONDS", "60")))
-    max_retries = int(os.getenv("GEMINI_MAX_RETRIES", os.getenv("NIM_MAX_RETRIES", "2")))
+    provider = os.getenv("AI_PROVIDER", "gemini").strip().lower()
+    if provider not in {"gemini", "nvidia"}:
+        raise NIMAPIError("AI_PROVIDER harus 'gemini' atau 'nvidia'.")
+
+    if provider == "nvidia":
+        api_key = os.getenv("NIM_API_KEY")
+        base_url = os.getenv("NIM_API_BASE_URL", "https://integrate.api.nvidia.com/v1")
+        model = os.getenv("NIM_MODEL_NAME", "meta/llama-3.1-8b-instruct")
+        timeout = int(os.getenv("NIM_REQUEST_TIMEOUT_SECONDS", "60"))
+        max_retries = int(os.getenv("NIM_MAX_RETRIES", "4"))
+        rate_limit_sleep = float(os.getenv("NIM_RATE_LIMIT_SLEEP_SECONDS", "30"))
+        missing_key_name = "NIM_API_KEY"
+    else:
+        api_key = os.getenv("GEMINI_API_KEY")
+        base_url = os.getenv("GEMINI_API_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
+        model = os.getenv("GEMINI_MODEL_NAME", "gemini-flash-latest")
+        timeout = int(os.getenv("GEMINI_REQUEST_TIMEOUT_SECONDS", "60"))
+        max_retries = int(os.getenv("GEMINI_MAX_RETRIES", "4"))
+        rate_limit_sleep = float(os.getenv("GEMINI_RATE_LIMIT_SLEEP_SECONDS", "30"))
+        missing_key_name = "GEMINI_API_KEY"
 
     if not api_key:
         raise NIMAPIError(
-            "GEMINI_API_KEY tidak ditemukan di environment variable. "
+            f"{missing_key_name} tidak ditemukan di environment variable. "
             "Set di file .env (lihat .env.example), jangan hardcode di source code."
         )
 
     return {
+        "provider": provider,
         "api_key": api_key,
         "base_url": base_url,
         "model": model,
         "timeout": timeout,
         "max_retries": max_retries,
+        "rate_limit_sleep": rate_limit_sleep,
     }
 
 
@@ -52,8 +69,9 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
             "Buatkan 8-12 flashcard (pertanyaan & jawaban singkat) dalam Bahasa Indonesia "
             "berdasarkan materi berikut. Jawab HANYA dengan JSON array, format: "
             '[{"pertanyaan": "...", "jawaban": "..."}]. '
-            "PENTING: jangan gunakan tanda kutip ganda (\") di dalam teks pertanyaan atau jawaban -- "
-            "kalau perlu mengutip sesuatu, gunakan tanda kutip tunggal ('). "
+            "WAJIB bungkus setiap key dan setiap value string JSON dengan tanda kutip ganda (\"). "
+            "Jangan gunakan tanda kutip ganda di DALAM isi teks pertanyaan/jawaban -- "
+            "kalau perlu mengutip sesuatu di dalam isi teks, gunakan tanda kutip tunggal ('). "
             "Jangan tambahkan teks lain di luar JSON."
         ),
         "rangkuman": (
@@ -105,8 +123,9 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
             "opsi_jawaban WAJIB tepat 4 string (bukan diberi label 'A'/'B'/'C'/'D' di dalam teksnya, "
             "urutannya sendiri yang menentukan label A/B/C/D), dan jawaban_benar WAJIB salah satu "
             "dari 'A', 'B', 'C', 'D' sesuai urutan indeks opsi_jawaban yang benar. "
-            "PENTING: jangan gunakan tanda kutip ganda (\") di dalam teks pertanyaan atau opsi "
-            "jawaban -- kalau perlu mengutip sesuatu, gunakan tanda kutip tunggal ('). "
+            "WAJIB bungkus setiap key dan setiap value string JSON dengan tanda kutip ganda (\"). "
+            "Jangan gunakan tanda kutip ganda di DALAM isi teks pertanyaan/opsi/alasan -- "
+            "kalau perlu mengutip sesuatu di dalam isi teks, gunakan tanda kutip tunggal ('). "
             "JANGAN membuat array JSON terpisah untuk tiap soal -- semua soal harus jadi elemen "
             "dari satu array yang sama, dipisahkan koma. Jangan tambahkan kalimat pembuka, "
             "penutup, atau teks lain di luar JSON."
@@ -122,7 +141,7 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
 
 def generate_content(materi_text: str, jenis_konten: str) -> dict:
     """
-    Memanggil Gemini API untuk menghasilkan konten (flashcard/rangkuman/soal).
+    Memanggil LLM provider untuk menghasilkan konten (flashcard/rangkuman/soal).
 
     Args:
         materi_text: teks materi yang sudah dipreprocess (lihat nlp_processor.py)
@@ -134,6 +153,73 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
     """
     config = _get_config()
     prompt = _build_prompt(materi_text, jenis_konten)
+
+    if config["provider"] == "nvidia":
+        return _generate_content_nvidia(config, prompt, jenis_konten)
+
+    return _generate_content_gemini(config, prompt, jenis_konten)
+
+
+def _generate_content_nvidia(config: dict, prompt: str, jenis_konten: str) -> dict:
+    headers = {
+        "Authorization": f"Bearer {config['api_key']}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    temperature = 0.15 if jenis_konten == "soal" else 0.2
+    payload = {
+        "model": config["model"],
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "top_p": 0.7,
+        "max_tokens": 1800,
+        "stream": False,
+    }
+
+    url = f"{config['base_url'].rstrip('/')}/chat/completions"
+    last_error = None
+    for attempt in range(1, config["max_retries"] + 2):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=config["timeout"])
+
+            if response.status_code == 429:
+                logger.warning("NVIDIA NIM API rate limited (percobaan %s)", attempt)
+                last_error = NIMAPIError("Rate limit tercapai pada NVIDIA NIM API (429).")
+                time.sleep(max(config["rate_limit_sleep"], min(2 ** attempt, 8)))
+                continue
+
+            response.raise_for_status()
+            data = response.json()
+            usage = data.get("usage") or None
+            content_str = data["choices"][0]["message"]["content"]
+            result = _parse_llm_json(content_str, jenis_konten)
+            result["token_usage"] = usage
+            return result
+
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response is not None else 500
+            safe_error = str(e).replace(config["api_key"], "[redacted]")
+            logger.warning("NVIDIA NIM API mengembalikan HTTP error (percobaan %s): %s", attempt, safe_error)
+            last_error = NIMAPIError(f"Gagal menghubungi NVIDIA NIM API (status {status_code}): {safe_error}")
+            if status_code == 429 or status_code >= 500:
+                wait_seconds = max(config["rate_limit_sleep"], min(2 ** attempt, 8)) if status_code == 429 else min(2 ** attempt, 8)
+                time.sleep(wait_seconds)
+                continue
+            raise last_error from None
+        except requests.exceptions.RequestException as e:
+            safe_error = str(e).replace(config["api_key"], "[redacted]")
+            logger.warning("Gagal memanggil NVIDIA NIM API (percobaan %s): %s", attempt, safe_error)
+            last_error = NIMAPIError(f"Gagal menghubungi NVIDIA NIM API: {safe_error}")
+            time.sleep(min(2 ** attempt, 8))
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            logger.error("Response NVIDIA NIM API tidak sesuai format yang diharapkan: %s", e)
+            raise NIMAPIError(f"Response NVIDIA NIM API tidak valid: {e}") from e
+
+    raise (last_error or NIMAPIError("Gagal memanggil NVIDIA NIM API setelah beberapa percobaan.")) from None
+
+
+def _generate_content_gemini(config: dict, prompt: str, jenis_konten: str) -> dict:
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
@@ -148,6 +234,8 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
         "generationConfig": {
             "temperature": temperature,
             "maxOutputTokens": 1500,
+            "responseMimeType": "application/json",
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
@@ -163,7 +251,7 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
                 # Rate limited: backoff singkat lalu retry (kontrol utama tetap di backend-api queue)
                 logger.warning("Gemini API rate limited (percobaan %s)", attempt)
                 last_error = NIMAPIError("Rate limit tercapai pada Gemini API (429).")
-                time.sleep(min(2 ** attempt, 8))
+                time.sleep(max(config["rate_limit_sleep"], min(2 ** attempt, 8)))
                 continue
 
             response.raise_for_status()
@@ -186,7 +274,8 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
             logger.warning("Gemini API mengembalikan HTTP error (percobaan %s): %s", attempt, safe_error)
             last_error = NIMAPIError(f"Gagal menghubungi Gemini API (status {status_code}): {safe_error}")
             if status_code == 429 or status_code >= 500:
-                time.sleep(min(2 ** attempt, 8))
+                wait_seconds = max(config["rate_limit_sleep"], min(2 ** attempt, 8)) if status_code == 429 else min(2 ** attempt, 8)
+                time.sleep(wait_seconds)
                 continue
             else:
                 raise last_error from None
@@ -267,6 +356,44 @@ def _escape_raw_control_chars_in_json_strings(text: str) -> str:
                 in_string = True
             result.append(ch)
 
+    return "".join(result)
+
+
+def _quote_unquoted_string_values(text: str) -> str:
+    """
+    Beberapa model chat-completion kadang menghasilkan JSON-ish seperti:
+      {"pertanyaan": Apa itu fotosintesis?, "jawaban": Proses ...}
+    Key sudah benar, tapi value string tidak diberi kutip. Fallback ini hanya
+    menargetkan field string yang dipakai aplikasi, lalu membungkus value
+    sampai delimiter JSON berikutnya (',' atau '}').
+    """
+    keys = ("pertanyaan", "jawaban", "alasan", "jawaban_benar", "type", "teks", "title")
+    result = []
+    i = 0
+    while i < len(text):
+        matched = False
+        for key in keys:
+            prefix = f'"{key}":'
+            if text.startswith(prefix, i):
+                result.append(prefix)
+                i += len(prefix)
+                while i < len(text) and text[i].isspace():
+                    result.append(text[i])
+                    i += 1
+                if i >= len(text) or text[i] in '"[{':
+                    matched = True
+                    break
+
+                start = i
+                while i < len(text) and text[i] not in ",}\n":
+                    i += 1
+                value = text[start:i].strip()
+                result.append(json.dumps(value, ensure_ascii=False))
+                matched = True
+                break
+        if not matched:
+            result.append(text[i])
+            i += 1
     return "".join(result)
 
 
@@ -371,6 +498,19 @@ def _parse_llm_json(content_str: str, jenis_konten: str = "") -> dict:
                 parsed = json.loads(sanitized)
                 logger.info(
                     "Berhasil parse JSON setelah escape karakter kontrol mentah dari LLM "
+                    "(jenis_konten=%s).",
+                    jenis_konten or "?",
+                )
+                return {"parsed": parsed, "raw_text": content_str}
+            except json.JSONDecodeError:
+                pass
+
+        quoted_values = _quote_unquoted_string_values(candidate)
+        if quoted_values != candidate:
+            try:
+                parsed = json.loads(quoted_values)
+                logger.info(
+                    "Berhasil parse JSON setelah membungkus value string yang tidak dikutip "
                     "(jenis_konten=%s).",
                     jenis_konten or "?",
                 )

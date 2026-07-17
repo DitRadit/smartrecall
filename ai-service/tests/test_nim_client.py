@@ -1,8 +1,8 @@
 """
-test_nim_client.py - Test untuk nim_client.py (integrasi Gemini via requests).
+test_nim_client.py - Test untuk nim_client.py (integrasi LLM provider via requests).
 
 Requests di-mock sepenuhnya -- test ini TIDAK memanggil API sungguhan,
-supaya tidak butuh API key/koneksi internet dan tidak memakan kuota Gemini.
+supaya tidak butuh API key/koneksi internet dan tidak memakan kuota provider.
 """
 import pytest
 import requests
@@ -27,35 +27,42 @@ class FakeResponse:
 
 @pytest.fixture(autouse=True)
 def set_api_key(monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key-not-real")
-    monkeypatch.setenv("GEMINI_MAX_RETRIES", "1")  # percepat test retry
+    monkeypatch.setenv("AI_PROVIDER", "nvidia")
+    monkeypatch.setenv("NIM_API_KEY", "test-key-not-real")
+    monkeypatch.setenv("NIM_MAX_RETRIES", "1")  # percepat test retry
 
 
 def test_generate_content_parses_json_dan_token_usage(monkeypatch):
+    captured_payload = {}
     fake_data = {
-        "candidates": [
+        "choices": [
             {
-                "content": {
-                    "parts": [{"text": '[{"pertanyaan": "Q1", "jawaban": "A1"}]'}]
+                "message": {
+                    "content": '[{"pertanyaan": "Q1", "jawaban": "A1"}]'
                 }
             }
         ],
-        "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 20, "totalTokenCount": 30}
+        "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
     }
     
-    monkeypatch.setattr(requests, "post", lambda *args, **kwargs: FakeResponse(200, fake_data))
+    def fake_post(*args, **kwargs):
+        captured_payload.update(kwargs["json"])
+        return FakeResponse(200, fake_data)
+
+    monkeypatch.setattr(requests, "post", fake_post)
 
     result = nim_client.generate_content("materi contoh", "flashcard")
 
     assert result["parsed"] == [{"pertanyaan": "Q1", "jawaban": "A1"}]
-    assert result["token_usage"] == {"promptTokenCount": 10, "candidatesTokenCount": 20, "totalTokenCount": 30}
+    assert result["token_usage"] == {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
+    assert captured_payload["model"] == "meta/llama-3.1-8b-instruct"
+    assert captured_payload["messages"][0]["role"] == "user"
 
 
 def test_generate_content_tanpa_api_key_melempar_nimapierror(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("NIM_API_KEY", raising=False)
 
-    with pytest.raises(nim_client.NIMAPIError, match="GEMINI_API_KEY tidak ditemukan"):
+    with pytest.raises(nim_client.NIMAPIError, match="NIM_API_KEY tidak ditemukan"):
         nim_client.generate_content("materi", "flashcard")
 
 
@@ -67,14 +74,14 @@ def test_generate_content_retry_saat_rate_limit_lalu_berhasil(monkeypatch):
         if call_count["n"] == 1:
             return FakeResponse(429)
         fake_data = {
-            "candidates": [
+            "choices": [
                 {
-                    "content": {
-                        "parts": [{"text": '[{"type": "paragraf", "teks": "Ringkasan berhasil setelah retry"}]'}]
+                    "message": {
+                        "content": '[{"type": "paragraf", "teks": "Ringkasan berhasil setelah retry"}]'
                     }
                 }
             ],
-            "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 10, "totalTokenCount": 15}
+            "usage": {"prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15}
         }
         return FakeResponse(200, fake_data)
 
@@ -96,7 +103,7 @@ def test_generate_content_error_selain_429_langsung_dilempar_tanpa_retry(monkeyp
 
     monkeypatch.setattr(requests, "post", fake_post)
 
-    with pytest.raises(nim_client.NIMAPIError, match="Gagal menghubungi Gemini API"):
+    with pytest.raises(nim_client.NIMAPIError, match="Gagal menghubungi NVIDIA NIM API"):
         nim_client.generate_content("materi", "soal")
 
     assert call_count["n"] == 1  # error non-429 tidak di-retry
@@ -109,7 +116,7 @@ def test_generate_content_connection_error_di_retry_habis_melempar_nimapierror(m
     monkeypatch.setattr(requests, "post", fake_post)
     monkeypatch.setattr(nim_client.time, "sleep", lambda s: None)
 
-    with pytest.raises(nim_client.NIMAPIError, match="Gagal menghubungi Gemini API"):
+    with pytest.raises(nim_client.NIMAPIError, match="Gagal menghubungi NVIDIA NIM API"):
         nim_client.generate_content("materi", "flashcard")
 
 
@@ -118,7 +125,7 @@ def test_generate_content_response_kosong_melempar_nimapierror(monkeypatch):
 
     monkeypatch.setattr(requests, "post", lambda *args, **kwargs: FakeResponse(200, fake_data))
 
-    with pytest.raises(nim_client.NIMAPIError, match="Response Gemini API tidak valid"):
+    with pytest.raises(nim_client.NIMAPIError, match="Response NVIDIA NIM API tidak valid"):
         nim_client.generate_content("materi", "flashcard")
 
 
@@ -154,8 +161,8 @@ def test_generate_content_soal_gabungkan_array_terpisah_per_soal(monkeypatch):
         '"jawaban_benar": "C"}]'
     )
     fake_data = {
-        "candidates": [{"content": {"parts": [{"text": llm_content}]}}],
-        "usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 50, "totalTokenCount": 150},
+        "choices": [{"message": {"content": llm_content}}],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
     }
 
     monkeypatch.setattr(requests, "post", lambda *args, **kwargs: FakeResponse(200, fake_data))
@@ -176,6 +183,30 @@ def test_generate_content_soal_gabungkan_array_terpisah_per_soal(monkeypatch):
     ]
 
 
+def test_generate_content_gemini_provider_memakai_json_mode(monkeypatch):
+    captured_payload = {}
+    monkeypatch.setenv("AI_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key-not-real")
+    monkeypatch.setenv("GEMINI_MAX_RETRIES", "1")
+
+    fake_data = {
+        "candidates": [{"content": {"parts": [{"text": '[{"pertanyaan": "Q", "jawaban": "A"}]'}]}}],
+        "usageMetadata": {"totalTokenCount": 12},
+    }
+
+    def fake_post(*args, **kwargs):
+        captured_payload.update(kwargs["json"])
+        return FakeResponse(200, fake_data)
+
+    monkeypatch.setattr(requests, "post", fake_post)
+
+    result = nim_client.generate_content("materi", "flashcard")
+
+    assert result["parsed"] == [{"pertanyaan": "Q", "jawaban": "A"}]
+    assert captured_payload["generationConfig"]["responseMimeType"] == "application/json"
+    assert captured_payload["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+
+
 def test_parse_multiple_json_values_kembalikan_none_kalau_cuma_satu_nilai():
     # Satu nilai JSON valid biasa -- bukan tanggung jawab fungsi ini,
     # caller (_parse_llm_json) sudah menanganinya lewat json.loads langsung.
@@ -184,3 +215,17 @@ def test_parse_multiple_json_values_kembalikan_none_kalau_cuma_satu_nilai():
 
 def test_parse_multiple_json_values_kembalikan_none_kalau_tidak_ada_json():
     assert nim_client._parse_multiple_json_values("bukan json sama sekali") is None
+
+
+def test_parse_llm_json_memperbaiki_value_string_tanpa_kutip():
+    content = (
+        '[{"pertanyaan": Apa itu fotosintesis?, "jawaban": Proses tumbuhan membuat makanan}, '
+        '{"pertanyaan": Apa hasil fotosintesis?, "jawaban": Oksigen dan glukosa}]'
+    )
+
+    result = nim_client._parse_llm_json(content, "flashcard")
+
+    assert result["parsed"] == [
+        {"pertanyaan": "Apa itu fotosintesis?", "jawaban": "Proses tumbuhan membuat makanan"},
+        {"pertanyaan": "Apa hasil fotosintesis?", "jawaban": "Oksigen dan glukosa"},
+    ]

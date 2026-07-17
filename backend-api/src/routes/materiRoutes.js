@@ -28,6 +28,9 @@ router.get('/', requireAuth, materiController.listMateri);
 // GET /materi/:id/draft (guru)
 router.get('/:id/draft', requireAuth, requireRole('guru'), materiController.getMateriDraft);
 
+// GET /materi/:id/ppt (guru) - download PPT hasil generate opsional
+router.get('/:id/ppt', requireAuth, requireRole('guru'), materiController.downloadMateriPpt);
+
 // POST /materi/:id/approve (guru)
 router.post('/:id/approve', requireAuth, requireRole('guru'), materiController.approveMateri);
 

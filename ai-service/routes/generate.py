@@ -11,13 +11,16 @@ Alur (ARCHITECTURE.md bagian 3.1):
 """
 
 import os
+import base64
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Blueprint, request, jsonify, current_app
 
 from services.pdf_extractor import extract_text_from_pdf, PDFExtractionError
 from services.nlp_processor import preprocess_for_generation, extract_keywords
 from services.nim_client import generate_content, NIMAPIError
+from services.ppt_generator import generate_pptx
 from utils.file_utils import is_allowed_file, save_uploaded_file
 
 generate_bp = Blueprint("generate", __name__)
@@ -25,6 +28,58 @@ logger = logging.getLogger("ai-service.routes.generate")
 
 ALL_JENIS_KONTEN = ["flashcard", "rangkuman", "soal"]
 VALID_JENIS_KONTEN = {"flashcard", "rangkuman", "soal", "all"}
+
+
+def _inter_request_delay_seconds() -> float:
+    return float(os.getenv("GEMINI_INTER_REQUEST_DELAY_SECONDS", "4"))
+
+
+def _generate_content_sequential(processed_text: str, jenis_list: list[str]):
+    draft = {}
+    errors = {}
+    delay_seconds = _inter_request_delay_seconds()
+
+    for index, jk in enumerate(jenis_list):
+        if index > 0 and delay_seconds > 0:
+            time.sleep(delay_seconds)
+        try:
+            result = generate_content(processed_text, jk)
+            draft[jk] = result
+
+            token_usage = result.get("token_usage")
+            if token_usage:
+                logger.info("[generate materi] jenis_konten=%s token_usage=%s", jk, token_usage)
+        except NIMAPIError as e:
+            logger.error("Gagal generate jenis_konten=%s: %s", jk, e)
+            draft[jk] = None
+            errors[jk] = str(e)
+
+    return draft, errors
+
+
+def _generate_content_parallel(processed_text: str, jenis_list: list[str]):
+    draft = {}
+    errors = {}
+
+    with ThreadPoolExecutor(max_workers=len(jenis_list)) as executor:
+        future_to_jk = {
+            executor.submit(generate_content, processed_text, jk): jk for jk in jenis_list
+        }
+        for future in as_completed(future_to_jk):
+            jk = future_to_jk[future]
+            try:
+                result = future.result()
+                draft[jk] = result
+
+                token_usage = result.get("token_usage")
+                if token_usage:
+                    logger.info("[generate materi] jenis_konten=%s token_usage=%s", jk, token_usage)
+            except NIMAPIError as e:
+                logger.error("Gagal generate jenis_konten=%s: %s", jk, e)
+                draft[jk] = None
+                errors[jk] = str(e)
+
+    return draft, errors
 
 
 @generate_bp.route("/materi", methods=["POST"])
@@ -65,6 +120,8 @@ def generate_materi():
 
     file = request.files["file"]
     jenis_konten = request.form.get("jenis_konten", "all").strip().lower()
+    should_generate_ppt = request.form.get("generate_ppt", "false").strip().lower() in {"true", "1", "yes"}
+    materi_title = request.form.get("judul", "").strip() or os.path.splitext(file.filename or "materi")[0]
 
     if file.filename == "":
         return jsonify({"status": "error", "message": "Nama file kosong"}), 400
@@ -90,31 +147,13 @@ def generate_materi():
         processed_text = preprocess_for_generation(raw_text)
         keywords = extract_keywords(raw_text)
 
-        draft = {}
-        errors = {}
-
-        # Ketiga jenis konten independen satu sama lain (masing-masing 1 HTTP call
-        # terpisah ke Gemini), jadi dijalankan PARALEL, bukan berurutan --
-        # supaya total waktu tunggu backend-api (AI_SERVICE_TIMEOUT_MS) tidak
-        # gampang kelewat untuk materi yang panjang (3x waktu 1 panggilan LLM
-        # kalau sekuensial, vs ~1x waktu panggilan terlama kalau paralel).
-        with ThreadPoolExecutor(max_workers=len(jenis_list)) as executor:
-            future_to_jk = {
-                executor.submit(generate_content, processed_text, jk): jk for jk in jenis_list
-            }
-            for future in as_completed(future_to_jk):
-                jk = future_to_jk[future]
-                try:
-                    result = future.result()
-                    draft[jk] = result
-
-                    token_usage = result.get("token_usage")
-                    if token_usage:
-                        logger.info("[generate materi] jenis_konten=%s token_usage=%s", jk, token_usage)
-                except NIMAPIError as e:
-                    logger.error("Gagal generate jenis_konten=%s: %s", jk, e)
-                    draft[jk] = None
-                    errors[jk] = str(e)
+        # Saat generate PPT aktif, total call Gemini menjadi empat
+        # (flashcard/rangkuman/soal/PPT). Jalankan berurutan supaya tidak
+        # langsung menabrak rate limit free tier.
+        if should_generate_ppt:
+            draft, errors = _generate_content_sequential(processed_text, jenis_list)
+        else:
+            draft, errors = _generate_content_parallel(processed_text, jenis_list)
 
         # Kalau SEMUA jenis gagal (mis. Gemini API down total), anggap request
         # gagal supaya backend-api mengarahkan guru ke fallback manual (FR-7).
@@ -128,6 +167,23 @@ def generate_materi():
         }
         if errors:
             response_body["errors"] = errors
+
+        if should_generate_ppt:
+            try:
+                delay_seconds = _inter_request_delay_seconds()
+                if delay_seconds > 0:
+                    time.sleep(delay_seconds)
+                pptx_bytes = generate_pptx(materi_title, processed_text)
+                response_body["ppt"] = {
+                    "filename": f"{materi_title}.pptx",
+                    "content_base64": base64.b64encode(pptx_bytes).decode("ascii"),
+                }
+            except NIMAPIError as e:
+                logger.error("Gagal generate PPT: %s", e)
+                response_body.setdefault("errors", {})["ppt"] = str(e)
+            except Exception as e:
+                logger.exception("Kesalahan tak terduga saat generate PPT")
+                response_body.setdefault("errors", {})["ppt"] = f"Gagal membuat PPT: {e}"
 
         return jsonify(response_body), 200
 

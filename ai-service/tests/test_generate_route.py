@@ -155,6 +155,32 @@ def test_generate_materi_bisa_diminta_satu_jenis_saja(client, monkeypatch):
     assert "rangkuman" not in body["draft"]
 
 
+def test_generate_materi_opsional_bisa_menghasilkan_ppt(client, monkeypatch):
+    monkeypatch.setattr("routes.generate.extract_text_from_pdf", lambda path: "Materi contoh.")
+    monkeypatch.setattr("routes.generate.preprocess_for_generation", lambda text: text)
+    monkeypatch.setattr("routes.generate.extract_keywords", lambda text: [])
+    monkeypatch.setattr(
+        "routes.generate.generate_content",
+        lambda materi_text, jenis_konten: {"parsed": [{"ok": jenis_konten}], "raw_text": "...", "token_usage": None},
+    )
+    monkeypatch.setattr("routes.generate.generate_pptx", lambda title, text: b"fake-pptx")
+
+    response = client.post(
+        "/generate/materi",
+        data={
+            "file": (_fake_pdf_bytes(), "materi.pdf"),
+            "judul": "Materi PPT",
+            "generate_ppt": "true",
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["ppt"]["filename"] == "Materi PPT.pptx"
+    assert body["ppt"]["content_base64"] == "ZmFrZS1wcHR4"
+
+
 def test_generate_materi_tanpa_file_mengembalikan_400(client):
     response = client.post("/generate/materi", data={}, content_type="multipart/form-data")
     assert response.status_code == 400

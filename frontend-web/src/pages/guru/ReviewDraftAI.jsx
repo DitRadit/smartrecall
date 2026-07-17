@@ -239,6 +239,23 @@ export default function ReviewDraftAI() {
     }
   }
 
+  async function downloadPpt() {
+    setError('');
+    try {
+      const response = await api.get(`/materi/${id}/ppt`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${materi.judul || 'materi'}.pptx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.message || 'PPT belum tersedia atau gagal didownload.');
+    }
+  }
+
   if (error && !materi) {
     return (
       <div className="max-w-5xl mx-auto px-container-padding py-stack-md">
@@ -567,6 +584,26 @@ export default function ReviewDraftAI() {
         </div>
 
         <aside className="space-y-4">
+          {materi.pptFile && (
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
+              <h3 className="text-label-md text-on-surface mb-2 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px]">slideshow</span>
+                PPT Materi
+              </h3>
+              <p className="text-label-sm text-on-surface-variant mb-3">
+                File PPT hasil AI sudah tersedia dari template yang dipilih.
+              </p>
+              <button
+                type="button"
+                onClick={downloadPpt}
+                className="h-touch-target-min w-full bg-primary text-on-primary rounded-lg text-label-md flex items-center justify-center gap-2 hover:opacity-90"
+              >
+                <span className="material-symbols-outlined text-[20px]">download</span>
+                Download PPT
+              </button>
+            </div>
+          )}
+
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
             <h3 className="text-label-md text-on-surface mb-3 flex items-center gap-2">
               <span className="material-symbols-outlined text-[20px]">add_circle</span>

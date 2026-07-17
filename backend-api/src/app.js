@@ -23,7 +23,32 @@ const aiServiceClient = require('./services/aiServiceClient');
 
 const app = express();
 
-app.use(cors({ origin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173' }));
+const configuredOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || configuredOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    try {
+      const { protocol, hostname, port } = new URL(origin);
+      const isLocalDevOrigin = protocol === 'http:' && port === '5173' && (
+        hostname === 'localhost'
+        || hostname === '127.0.0.1'
+        || hostname.startsWith('192.168.')
+        || hostname.startsWith('10.')
+        || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+      );
+      return callback(null, isLocalDevOrigin);
+    } catch (error) {
+      return callback(error);
+    }
+  },
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

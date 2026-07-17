@@ -12,6 +12,7 @@ jest.mock('../src/config/db', () => ({
   flashcard: { createMany: jest.fn() },
   bankSoal: { createMany: jest.fn() },
   rangkuman: { upsert: jest.fn() },
+  materi: { update: jest.fn() },
 }));
 
 jest.mock('../src/services/aiServiceClient', () => ({
@@ -46,7 +47,10 @@ describe('generateAIContentInBackground', () => {
 
     await generateAIContentInBackground(1, Buffer.from('fake-pdf'), 'materi.pdf');
 
-    expect(aiServiceClient.generateMateri).toHaveBeenCalledWith(Buffer.from('fake-pdf'), 'materi.pdf');
+    expect(aiServiceClient.generateMateri).toHaveBeenCalledWith(Buffer.from('fake-pdf'), 'materi.pdf', 'all', {
+      generatePpt: false,
+      judul: undefined,
+    });
     expect(prisma.flashcard.createMany).toHaveBeenCalledTimes(1);
     expect(prisma.bankSoal.createMany).toHaveBeenCalledTimes(1);
     expect(prisma.rangkuman.upsert).toHaveBeenCalledTimes(1);
@@ -123,5 +127,34 @@ describe('generateAIContentInBackground', () => {
     await generateAIContentInBackground(5, Buffer.from('fake-pdf'), 'materi5.pdf');
 
     expect(prisma.rangkuman.upsert).not.toHaveBeenCalled();
+  });
+
+  it('meminta dan menyimpan PPT jika opsi generatePpt aktif', async () => {
+    aiServiceClient.generateMateri.mockResolvedValue({
+      status: 'success',
+      draft: {
+        flashcard: { parsed: [{ pertanyaan: 'Q', jawaban: 'A' }] },
+        rangkuman: { parsed: [{ type: 'paragraf', teks: 'Rangkuman valid.' }] },
+        soal: { parsed: [{ pertanyaan: 'Q2', opsi_jawaban: ['A', 'B'], jawaban_benar: 'A' }] },
+      },
+      ppt: {
+        filename: 'materi.pptx',
+        content_base64: Buffer.from('fake-ppt').toString('base64'),
+      },
+    });
+
+    await generateAIContentInBackground(6, Buffer.from('fake-pdf'), 'materi6.pdf', {
+      generatePpt: true,
+      judul: 'Materi 6',
+    });
+
+    expect(aiServiceClient.generateMateri).toHaveBeenCalledWith(Buffer.from('fake-pdf'), 'materi6.pdf', 'all', {
+      generatePpt: true,
+      judul: 'Materi 6',
+    });
+    expect(prisma.materi.update).toHaveBeenCalledWith({
+      where: { id: 6 },
+      data: { pptFile: '6-Materi-6.pptx' },
+    });
   });
 });
