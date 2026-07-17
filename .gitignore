@@ -32,6 +32,8 @@ ai-service/uploads/*
 !ai-service/uploads/.gitkeep
 backend-api/database/*
 !backend-api/database/.gitkeep
+!backend-api/database/seeds/
+!backend-api/database/seeds/seed.js
 backend-api/prisma/database/*
 !backend-api/prisma/database/.gitkeep
 
