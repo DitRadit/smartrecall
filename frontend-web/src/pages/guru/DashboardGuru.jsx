@@ -39,6 +39,23 @@ export default function DashboardGuru() {
     }
   }
 
+  async function downloadPpt(materi) {
+    setError('');
+    try {
+      const response = await api.get(`/materi/${materi.id}/ppt`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${materi.judul || 'materi'}.pptx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.message || 'PPT belum tersedia atau gagal didownload.');
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto">
       <header className="flex flex-wrap justify-between items-center gap-4 px-container-padding py-stack-md">
@@ -65,6 +82,7 @@ export default function DashboardGuru() {
                 <tr>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Judul Materi</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Status</th>
+                  <th className="px-6 py-4 text-label-md text-on-surface-variant">PPT</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant text-right">Aksi</th>
                 </tr>
               </thead>
@@ -90,17 +108,34 @@ export default function DashboardGuru() {
                         {m.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4">
+                      {m.pptFile ? (
+                        <button
+                          type="button"
+                          onClick={() => downloadPpt(m)}
+                          className="text-primary hover:underline text-label-sm inline-flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">download</span>
+                          Download
+                        </button>
+                      ) : (
+                        <span className="text-label-sm text-on-surface-variant inline-flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[18px]">remove</span>
+                          Tidak ada
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-4">
                         <Link
-  to={`/guru/review/${m.id}`}
-  className="text-primary hover:underline text-label-sm inline-flex items-center gap-1"
->
-  <span className="material-symbols-outlined text-[18px]">
-    {m.status === 'draft' ? 'rate_review' : 'edit'}
-  </span>
-  {m.status === 'draft' ? 'Review Draft' : 'Edit Materi'}
-</Link>
+                          to={`/guru/review/${m.id}`}
+                          className="text-primary hover:underline text-label-sm inline-flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {m.status === 'draft' ? 'rate_review' : 'edit'}
+                          </span>
+                          {m.status === 'draft' ? 'Review Draft' : 'Edit Materi'}
+                        </Link>
                         <button
                           type="button"
                           onClick={() => handleDelete(m)}
@@ -116,7 +151,7 @@ export default function DashboardGuru() {
                 ))}
                 {materiList.length === 0 && !error && (
                   <tr>
-                    <td colSpan={3} className="px-6 py-8 text-center text-body-md text-on-surface-variant">
+                    <td colSpan={4} className="px-6 py-8 text-center text-body-md text-on-surface-variant">
                       Belum ada materi. Mulai dengan upload materi pertama Anda.
                     </td>
                   </tr>

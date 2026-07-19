@@ -8,7 +8,7 @@ Platform microlearning berbasis AI dan spaced repetition untuk membantu sekolah 
 
 - Autentikasi dan pembatasan akses untuk guru serta siswa.
 - Upload PDF dengan validasi tipe dan ukuran file.
-- Ekstraksi PDF dan pembuatan draft konten melalui Gemini.
+- Ekstraksi PDF dan pembuatan draft konten melalui NVIDIA NIM.
 - Human-in-the-loop: hasil AI harus ditinjau guru sebelum dipublikasikan.
 - Editor rangkuman, flashcard, dan bank soal.
 - Input flashcard manual saat AI atau internet tidak tersedia.
@@ -26,7 +26,7 @@ flowchart LR
     F -->|REST API| B["Express API"]
     B --> D[("SQLite")]
     B -->|Generate materi| A["Flask AI Service"]
-    A -->|Internet hanya saat generate| N["Gemini API"]
+    A -->|Internet hanya saat generate| N["NVIDIA NIM API"]
 ```
 
 Frontend hanya berkomunikasi dengan backend. `ai-service` adalah satu-satunya komponen yang membutuhkan internet publik, dan hanya ketika guru membuat konten AI. IndexedDB digunakan sebagai cache serta antrean sementara; progres final tetap disimpan di SQLite.
@@ -38,7 +38,7 @@ Frontend hanya berkomunikasi dengan backend. `ai-service` adalah satu-satunya ko
 | Frontend | React 18, Vite, Tailwind CSS, PWA, IndexedDB |
 | Backend | Node.js 20, Express, Prisma, SQLite, JWT |
 | AI service | Python 3.11, Flask, pdfplumber, Sastrawi, requests |
-| AI provider | Gemini (`gemini-flash-latest`) |
+| AI provider | NVIDIA NIM (`meta/llama-3.1-8b-instruct`) |
 | Testing | Jest, Vitest, Testing Library, Pytest |
 | Deployment | Docker Compose atau proses lokal |
 
@@ -46,7 +46,7 @@ Frontend hanya berkomunikasi dengan backend. `ai-service` adalah satu-satunya ko
 
 ```text
 smartrecall/
-├── ai-service/          # Ekstraksi PDF, preprocessing, dan Gemini
+├── ai-service/          # Ekstraksi PDF, preprocessing, dan NVIDIA NIM
 ├── backend-api/         # Gateway API, auth, database, SM-2, dan kuis
 ├── frontend-web/        # React PWA untuk guru dan siswa
 ├── docs/                # PRD, arsitektur, API spec, dan referensi desain
@@ -59,7 +59,7 @@ smartrecall/
 - Node.js 20 atau lebih baru
 - npm 10 atau lebih baru
 - Python 3.11 atau lebih baru
-- API key Gemini dari Google AI Studio untuk generate AI
+- API key NVIDIA NIM untuk generate AI
 - Docker dan Docker Compose, opsional
 
 ## Menjalankan secara lokal
@@ -79,7 +79,8 @@ Ganti `USERNAME` dengan pemilik repository. Kemudian atur minimal:
 
 ```dotenv
 # ai-service/.env
-GEMINI_API_KEY=your_gemini_api_key
+AI_PROVIDER=nvidia
+NIM_API_KEY=your_nvidia_nim_api_key
 
 # backend-api/.env
 JWT_SECRET=ganti_dengan_random_secret_yang_panjang
@@ -134,7 +135,7 @@ Buka `http://localhost:5173` di browser.
 
 ## Menjalankan dengan Docker Compose
 
-Salin ketiga file environment seperti langkah sebelumnya, isi `GEMINI_API_KEY` dan `JWT_SECRET`, lalu jalankan:
+Salin ketiga file environment seperti langkah sebelumnya, isi `NIM_API_KEY` dan `JWT_SECRET`, lalu jalankan:
 
 ```bash
 docker compose up --build
@@ -165,14 +166,17 @@ Setelah `npm run seed`:
 
 | Variabel | Keterangan | Default |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | API key Gemini | wajib untuk generate |
-| `GEMINI_API_BASE_URL` | Base URL Gemini | `https://generativelanguage.googleapis.com/v1beta` |
-| `GEMINI_MODEL_NAME` | Model yang digunakan | `gemini-flash-latest` |
+| `AI_PROVIDER` | Provider AI aktif | `nvidia` |
+| `NIM_API_KEY` | API key NVIDIA NIM | wajib untuk generate |
+| `NIM_API_BASE_URL` | Base URL NVIDIA NIM | `https://integrate.api.nvidia.com/v1` |
+| `NIM_MODEL_NAME` | Model yang digunakan | `meta/llama-3.1-8b-instruct` |
 | `PORT` | Port AI service | `5001` |
 | `UPLOAD_FOLDER` | Folder upload sementara | `./uploads` |
 | `MAX_CONTENT_LENGTH_MB` | Batas ukuran PDF | `20` |
-| `GEMINI_REQUEST_TIMEOUT_SECONDS` | Timeout request Gemini | `60` |
-| `GEMINI_MAX_RETRIES` | Maksimum retry Gemini | `2` |
+| `NIM_REQUEST_TIMEOUT_SECONDS` | Timeout request NVIDIA NIM | `60` |
+| `NIM_MAX_RETRIES` | Maksimum retry NVIDIA NIM | `4` |
+| `NIM_RATE_LIMIT_SLEEP_SECONDS` | Jeda retry saat rate limit | `30` |
+| `AI_INTER_REQUEST_DELAY_SECONDS` | Jeda antar request generate berurutan | `6` |
 
 ### Backend
 
@@ -269,7 +273,7 @@ Database SQLite tetap menjadi source of truth. Jangan menggunakan IndexedDB seba
 
 ### Generate AI gagal
 
-- Pastikan `GEMINI_API_KEY` valid dan tidak memiliki spasi tambahan.
+- Pastikan `NIM_API_KEY` valid dan tidak memiliki spasi tambahan.
 - Pastikan laptop memiliki internet saat guru menekan generate.
 - Periksa health check: `curl http://localhost:5001/health`.
 - Pastikan PDF memiliki teks yang dapat diekstrak, bukan hanya gambar hasil scan.

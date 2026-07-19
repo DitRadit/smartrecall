@@ -6,6 +6,16 @@
  */
 
 const prisma = require('../config/db');
+const aiServiceClient = require('../services/aiServiceClient');
+
+function normalizeFlashcardCandidates(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.items)) return parsed.items;
+  if (Array.isArray(parsed?.flashcards)) return parsed.flashcards;
+  if (Array.isArray(parsed?.flashcard)) return parsed.flashcard;
+  if (parsed?.pertanyaan && parsed?.jawaban) return [parsed];
+  return [];
+}
 
 /**
  * POST /flashcard/manual
@@ -107,6 +117,57 @@ async function deleteFlashcard(req, res) {
   }
 }
 
+async function regenerateFlashcardsByMateri(req, res) {
+  try {
+    const materiId = parseInt(req.params.id, 10);
+    const materi = await prisma.materi.findFirst({
+      where: { id: materiId, guruId: req.user.id },
+      include: { flashcards: { orderBy: { id: 'asc' } } },
+    });
+
+    if (!materi) {
+      return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
+    }
+    if (!materi.flashcards.length) {
+      return res.status(400).json({ error: 'bad_request', message: 'Belum ada flashcard untuk digenerate ulang' });
+    }
+
+    const result = await aiServiceClient.generateVariant('flashcard', {
+      judul_materi: materi.judul,
+      items: materi.flashcards.map((f) => ({ pertanyaan: f.pertanyaan, jawaban: f.jawaban })),
+    });
+    const parsed = result?.draft?.parsed;
+    const candidates = normalizeFlashcardCandidates(parsed);
+    const validCandidates = candidates.filter((item) => item?.pertanyaan && item?.jawaban);
+    if (validCandidates.length === 0) {
+      return res.status(502).json({ error: 'bad_ai_response', message: 'AI gagal menghasilkan flashcard pengganti yang valid' });
+    }
+
+    await prisma.$transaction(
+      materi.flashcards.map((flashcard, index) => {
+        const candidate = validCandidates[index % validCandidates.length];
+        return prisma.flashcard.update({
+          where: { id: flashcard.id },
+          data: {
+            pertanyaan: candidate.pertanyaan,
+            jawaban: candidate.jawaban,
+            status: 'draft',
+          },
+        });
+      }),
+    );
+
+    const flashcards = await prisma.flashcard.findMany({ where: { materiId }, orderBy: { id: 'asc' } });
+    return res.status(200).json({ flashcards });
+  } catch (err) {
+    console.error('regenerateFlashcardsByMateri error:', err);
+    return res.status(err.statusCode || 500).json({
+      error: err.name === 'AIServiceError' ? 'ai_service_error' : 'internal_error',
+      message: err.message || 'Gagal generate ulang semua flashcard',
+    });
+  }
+}
+
 /**
  * GET /flashcard/materi/:id
  * Siswa mengambil SEMUA flashcard published (status "approved") untuk 1
@@ -142,4 +203,10 @@ async function getFlashcardsByMateri(req, res) {
   }
 }
 
-module.exports = { createManualFlashcard, updateFlashcard, deleteFlashcard, getFlashcardsByMateri };
+module.exports = {
+  createManualFlashcard,
+  updateFlashcard,
+  regenerateFlashcardsByMateri,
+  deleteFlashcard,
+  getFlashcardsByMateri,
+};

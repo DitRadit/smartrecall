@@ -1,5 +1,5 @@
 """
-nim_client.py - Wrapper untuk memanggil provider LLM (NVIDIA NIM atau Gemini).
+nim_client.py - Wrapper untuk memanggil provider LLM.
 
 PENTING (ARCHITECTURE.md bagian 7 & 8):
 - API key WAJIB diambil dari environment variable, jangan hardcode.
@@ -12,9 +12,37 @@ import os
 import json
 import logging
 import time
+import secrets
 import requests
 
 logger = logging.getLogger("ai-service.nim_client")
+
+NON_MATERI_KEYWORDS = (
+    "undang-undang",
+    "undang undang",
+    "uu no",
+    "uu nomor",
+    "pasal",
+    "sanksi pelanggaran",
+    "hak cipta",
+    "copyright",
+    "isbn",
+    "penerbit",
+    "editor",
+    "penyunting",
+    "desain sampul",
+    "desain cover",
+    "tata letak",
+    "kata pengantar",
+    "prakata",
+    "daftar isi",
+    "daftar pustaka",
+    "tentang penulis",
+    "biodata penulis",
+    "riwayat hidup penulis",
+    "nama buku",
+    "judul buku",
+)
 
 
 class NIMAPIError(Exception):
@@ -23,7 +51,7 @@ class NIMAPIError(Exception):
 
 
 def _get_config():
-    provider = os.getenv("AI_PROVIDER", "gemini").strip().lower()
+    provider = os.getenv("AI_PROVIDER", "nvidia").strip().lower()
     if provider not in {"gemini", "nvidia"}:
         raise NIMAPIError("AI_PROVIDER harus 'gemini' atau 'nvidia'.")
 
@@ -64,8 +92,19 @@ def _get_config():
 def _build_prompt(materi_text: str, jenis_konten: str) -> str:
     """Menyusun prompt sesuai jenis konten yang diminta (flashcard/rangkuman/soal)."""
 
+    source_guard = (
+        "Gunakan HANYA konsep inti pembelajaran dari isi bab/materi. "
+        "ABAIKAN dan JANGAN jadikan pertanyaan/rangkuman/soal dari metadata buku, "
+        "sampul, judul buku, nama penulis, penerbit, ISBN, hak cipta, undang-undang, "
+        "sanksi pelanggaran, kata pengantar, prakata, daftar isi, daftar pustaka, "
+        "tentang penulis, biodata penulis, nomor halaman, header/footer, atau informasi administratif. "
+        "Jika teks yang diberikan memuat bagian non-materi tersebut, anggap sebagai noise dan fokus pada "
+        "fakta, definisi, proses, struktur, fungsi, contoh, dan hubungan konsep yang benar-benar diajarkan. "
+    )
+
     instructions = {
         "flashcard": (
+            source_guard +
             "Buatkan 8-12 flashcard (pertanyaan & jawaban singkat) dalam Bahasa Indonesia "
             "berdasarkan materi berikut. Jawab HANYA dengan JSON array, format: "
             '[{"pertanyaan": "...", "jawaban": "..."}]. '
@@ -75,6 +114,7 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
             "Jangan tambahkan teks lain di luar JSON."
         ),
         "rangkuman": (
+            source_guard +
             "Buatkan rangkuman materi berikut dalam Bahasa Indonesia, bahasa sederhana "
             "sesuai kurikulum sekolah. Jawab HANYA dengan JSON array berisi blok konten "
             "terstruktur, TANPA teks lain di luar array. Tiap elemen array adalah satu "
@@ -94,6 +134,7 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
             "Jangan pakai markdown bold/italic (*, **) di dalam teks manapun."
         ),
         "soal": (
+            source_guard +
             "Buatkan 5-10 soal pilihan ganda (4 opsi: A/B/C/D) dalam Bahasa Indonesia berdasarkan "
             "materi berikut, untuk MENGUJI PEMAHAMAN siswa, bukan sekadar hafalan istilah. "
             "ATURAN PENTING supaya soal bervariasi dan tidak terasa berulang:\n"
@@ -139,6 +180,113 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
     return f"{instruction}\n\nMateri:\n{materi_text}"
 
 
+def _build_variant_prompt(source_content: dict, jenis_konten: str) -> str:
+    variation_seed = secrets.token_hex(6)
+    source_json = json.dumps(source_content, ensure_ascii=False)
+    base = (
+        "Buat versi alternatif yang BERBEDA dari konten berikut dalam Bahasa Indonesia. "
+        "Jangan hanya parafrase ringan; ubah sudut pertanyaan, struktur kalimat, contoh, "
+        "dan pilihan kata, tetapi makna pembelajaran harus tetap benar dan relevan. "
+        "Jangan membuat konten tentang metadata buku, undang-undang, hak cipta, ISBN, "
+        "penerbit, daftar isi, atau informasi administratif. "
+        f"Variation seed: {variation_seed}. "
+    )
+
+    if jenis_konten == "flashcard":
+        return (
+            base +
+            "Jika versi lama berisi field 'items' berupa array, buat JSON array dengan jumlah item yang sama. "
+            "Untuk mode array, JANGAN bungkus dengan object seperti {'items': ...} atau {'flashcards': ...}; "
+            "langsung kembalikan array JSON. "
+            "Jika versi lama hanya satu object, jawab satu JSON object. Tiap flashcard wajib format "
+            '{"pertanyaan": "...", "jawaban": "..."}. '
+            "Pertanyaan dan jawaban wajib berbeda jelas dari versi lama.\n\n"
+            f"Versi lama:\n{source_json}"
+        )
+    if jenis_konten == "soal":
+        return (
+            base +
+            "Jika versi lama berisi field 'items' berupa array, buat JSON array dengan jumlah soal yang sama. "
+            "Untuk mode array, JANGAN bungkus dengan object seperti {'items': ...}, {'soal': ...}, atau {'bank_soal': ...}; "
+            "langsung kembalikan array JSON. "
+            "Jika versi lama hanya satu object, jawab satu JSON object. Tiap soal wajib format "
+            '{"pertanyaan": "...", "opsi_jawaban": ["...","...","...","..."], '
+            '"alasan": "...", "jawaban_benar": "A"}. '
+            "JANGAN pakai key lain seperti 'question', 'options', 'answer', atau 'correct_answer'. "
+            "Buat soal pilihan ganda baru dengan tepat 4 opsi. Opsi jawaban tidak boleh "
+            "sekadar disalin dari versi lama; pengecoh harus masuk akal, dan jawaban_benar "
+            "wajib salah satu dari A/B/C/D sesuai urutan opsi.\n\n"
+            f"Versi lama:\n{source_json}"
+        )
+    if jenis_konten == "rangkuman":
+        return (
+            base +
+            "Jawab HANYA dengan JSON array blok konten terstruktur seperti format lama. "
+            "JANGAN bungkus dengan object seperti {'konten': ...}, {'blocks': ...}, atau {'rangkuman': ...}; "
+            "langsung kembalikan array JSON. "
+            "Susun ulang penjelasan, poin penting, dan contoh supaya hasilnya terasa baru "
+            "namun tetap membahas inti materi yang sama.\n\n"
+            f"Versi lama:\n{source_json}"
+        )
+
+    raise ValueError(f"jenis_konten tidak dikenal: {jenis_konten}")
+
+
+def _contains_non_materi_noise(text: str) -> bool:
+    text_lower = (text or "").lower()
+    return any(keyword in text_lower for keyword in NON_MATERI_KEYWORDS)
+
+
+def _collect_strings(value) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        strings = []
+        for item in value:
+            strings.extend(_collect_strings(item))
+        return strings
+    if isinstance(value, dict):
+        strings = []
+        for item in value.values():
+            strings.extend(_collect_strings(item))
+        return strings
+    return []
+
+
+def _is_non_materi_item(item) -> bool:
+    return _contains_non_materi_noise(" ".join(_collect_strings(item)))
+
+
+def _filter_non_materi_items(parsed, jenis_konten: str):
+    """
+    Guardrail setelah JSON berhasil diparse. Model kadang tetap membuat item dari
+    halaman copyright/metadata walau prompt sudah melarangnya; item seperti itu
+    tidak boleh masuk draft guru.
+    """
+    if isinstance(parsed, list):
+        if jenis_konten == "rangkuman":
+            filtered_blocks = []
+            for block in parsed:
+                if isinstance(block, dict) and block.get("type") == "list":
+                    clean_items = [
+                        item for item in block.get("items", [])
+                        if not _contains_non_materi_noise(str(item))
+                    ]
+                    if clean_items:
+                        clean_block = dict(block)
+                        clean_block["items"] = clean_items
+                        filtered_blocks.append(clean_block)
+                elif not _is_non_materi_item(block):
+                    filtered_blocks.append(block)
+            return filtered_blocks
+        return [item for item in parsed if not _is_non_materi_item(item)]
+
+    if isinstance(parsed, dict) and _is_non_materi_item(parsed):
+        return None
+
+    return parsed
+
+
 def generate_content(materi_text: str, jenis_konten: str) -> dict:
     """
     Memanggil LLM provider untuk menghasilkan konten (flashcard/rangkuman/soal).
@@ -153,6 +301,16 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
     """
     config = _get_config()
     prompt = _build_prompt(materi_text, jenis_konten)
+
+    if config["provider"] == "nvidia":
+        return _generate_content_nvidia(config, prompt, jenis_konten)
+
+    return _generate_content_gemini(config, prompt, jenis_konten)
+
+
+def generate_variant(source_content: dict, jenis_konten: str) -> dict:
+    config = _get_config()
+    prompt = _build_variant_prompt(source_content, jenis_konten)
 
     if config["provider"] == "nvidia":
         return _generate_content_nvidia(config, prompt, jenis_konten)
@@ -488,6 +646,7 @@ def _parse_llm_json(content_str: str, jenis_konten: str = "") -> dict:
     for candidate in list(attempts):
         try:
             parsed = json.loads(candidate)
+            parsed = _filter_non_materi_items(parsed, jenis_konten)
             return {"parsed": parsed, "raw_text": content_str}
         except json.JSONDecodeError:
             pass
@@ -496,6 +655,7 @@ def _parse_llm_json(content_str: str, jenis_konten: str = "") -> dict:
         if sanitized != candidate:
             try:
                 parsed = json.loads(sanitized)
+                parsed = _filter_non_materi_items(parsed, jenis_konten)
                 logger.info(
                     "Berhasil parse JSON setelah escape karakter kontrol mentah dari LLM "
                     "(jenis_konten=%s).",
@@ -509,6 +669,7 @@ def _parse_llm_json(content_str: str, jenis_konten: str = "") -> dict:
         if quoted_values != candidate:
             try:
                 parsed = json.loads(quoted_values)
+                parsed = _filter_non_materi_items(parsed, jenis_konten)
                 logger.info(
                     "Berhasil parse JSON setelah membungkus value string yang tidak dikutip "
                     "(jenis_konten=%s).",
@@ -524,6 +685,7 @@ def _parse_llm_json(content_str: str, jenis_konten: str = "") -> dict:
     for candidate in attempts:
         merged = _parse_multiple_json_values(candidate)
         if merged is not None:
+            merged = _filter_non_materi_items(merged, jenis_konten)
             logger.info(
                 "Berhasil parse JSON setelah menggabungkan beberapa nilai JSON "
                 "top-level terpisah dari LLM (jenis_konten=%s).",

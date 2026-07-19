@@ -27,14 +27,26 @@ def _should_skip_page(text: str, page_number: int) -> bool:
     if page_number <= 15:
         copyright_indicators = [
             "sanksi pelanggaran pasal",
+            "sanksi pelanggaran undang-undang",
             "uu no 28 tahun 2014",
+            "uu nomor 28 tahun 2014",
             "undang-undang nomor 28 tahun 2014",
+            "undang-undang hak cipta",
             "dilarang keras menerjemahkan",
+            "dilarang memperbanyak",
+            "dilarang mengutip",
             "tanpa izin tertulis dari penerbit",
+            "hak cipta dilindungi",
+            "all rights reserved",
             "tata letak:",
             "desain cover:",
+            "desain sampul:",
+            "editor:",
+            "penyunting:",
             "isbn:",
+            "e-isbn:",
             "anggota ikapi",
+            "diterbitkan oleh",
             "www.penerbit",
         ]
         if any(ind in text_lower for ind in copyright_indicators):

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
 import { cacheSoal, getCachedSoal } from '../../offline/indexedDbCache';
@@ -68,7 +69,11 @@ export default function KerjakanSoal() {
       const result = await submitQuizWithFallback({ materi_id: Number(materiId), jawaban });
 
       if (result.synced) {
-        setHasil({ skor_benar: result.data.skor_benar, total_soal: result.data.total_soal });
+        setHasil({
+          skor_benar: result.data.skor_benar,
+          total_soal: result.data.total_soal,
+          detail: result.data.detail || [],
+        });
         setSubmitMessage('Hasil kuis tersimpan.');
       } else {
         setSubmitMessage(
@@ -93,19 +98,81 @@ export default function KerjakanSoal() {
 
   if (hasil) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-container-padding text-center">
-        <span className="material-symbols-outlined text-[56px] text-on-tertiary-container mb-3">check_circle</span>
-        <h2 className="text-headline-lg-mobile text-primary mb-2">Hasil Kuis</h2>
-        {hasil.pending ? (
-          <p className="hint-text max-w-sm">{submitMessage}</p>
-        ) : (
-          <>
-            <p className="text-headline-md text-on-surface">
-              Skor kamu: {hasil.skor_benar} / {hasil.total_soal}
-            </p>
-            <p className="hint-text mt-2">{submitMessage}</p>
-          </>
-        )}
+      <div className="min-h-screen bg-background px-container-padding py-stack-md">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-6">
+            <span className="material-symbols-outlined text-[56px] text-on-tertiary-container mb-3">check_circle</span>
+            <h2 className="text-headline-lg-mobile text-primary mb-2">Hasil Kuis</h2>
+            {hasil.pending ? (
+              <p className="hint-text max-w-sm mx-auto">{submitMessage}</p>
+            ) : (
+              <>
+                <p className="text-headline-md text-on-surface">
+                  Skor kamu: {hasil.skor_benar} / {hasil.total_soal}
+                </p>
+                <p className="hint-text mt-2">{submitMessage}</p>
+              </>
+            )}
+          </div>
+
+          {!hasil.pending && hasil.detail?.length > 0 && (
+            <div className="space-y-4 text-left">
+              {hasil.detail.map((item, index) => (
+                <div key={item.soal_id || index} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <h3 className="text-body-md text-on-surface font-semibold">
+                      {index + 1}. {item.pertanyaan}
+                    </h3>
+                    <span
+                      className={`shrink-0 px-3 py-1 rounded-full text-label-sm font-bold ${
+                        item.benar
+                          ? 'bg-on-tertiary-container/10 text-on-tertiary-container'
+                          : 'bg-error/10 text-error'
+                      }`}
+                    >
+                      {item.benar ? 'Benar' : 'Salah'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {(item.opsi_jawaban || []).map((opsi, i) => {
+                      const label = OPSI_LABELS[i];
+                      const isSelected = item.jawaban_dipilih === label;
+                      const isCorrect = item.jawaban_benar === label;
+                      return (
+                        <div
+                          key={label}
+                          className={`border rounded-lg px-3 py-2 text-label-sm ${
+                            isCorrect
+                              ? 'border-on-tertiary-container bg-on-tertiary-container/10 text-on-tertiary-container'
+                              : isSelected
+                                ? 'border-error bg-error/10 text-error'
+                                : 'border-outline-variant text-on-surface-variant'
+                          }`}
+                        >
+                          <span className="font-bold">{label}.</span> {opsi}
+                          {isCorrect && <span className="font-bold"> (jawaban benar)</span>}
+                          {isSelected && !isCorrect && <span className="font-bold"> (jawaban kamu)</span>}
+                          {isSelected && isCorrect && <span className="font-bold"> (jawaban kamu)</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-center">
+            <Link
+              to="/siswa/materi"
+              className="h-touch-target-min px-6 rounded-xl bg-primary text-on-primary text-label-md inline-flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined">arrow_back</span>
+              Kembali ke Materi
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

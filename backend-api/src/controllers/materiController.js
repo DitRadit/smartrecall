@@ -211,7 +211,7 @@ async function listMateri(req, res) {
     const materiList = await prisma.materi.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      select: { id: true, judul: true, status: true, createdAt: true },
+      select: { id: true, judul: true, status: true, pptFile: true, createdAt: true },
     });
 
     return res.status(200).json({ materi: materiList });

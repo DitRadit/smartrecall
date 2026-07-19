@@ -2,7 +2,7 @@
 ppt_generator.py - Membuat PPTX opsional untuk guru dari materi PDF.
 
 Alur:
-- Gemini membuat outline slide terstruktur.
+- Provider LLM membuat outline slide terstruktur.
 - python-pptx mengisi outline ke template PPTX yang sudah disediakan.
 - File PPTX dikembalikan sebagai bytes ke backend-api untuk disimpan dan
   disediakan sebagai download guru.

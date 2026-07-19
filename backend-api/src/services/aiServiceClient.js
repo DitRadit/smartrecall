@@ -66,6 +66,26 @@ async function generateMateri(fileBuffer, originalFilename, jenisKonten = 'all',
   }
 }
 
+async function generateVariant(jenisKonten, sourceContent) {
+  try {
+    const response = await axios.post(
+      `${AI_SERVICE_URL}/generate/variant`,
+      { jenis_konten: jenisKonten, source_content: sourceContent },
+      { timeout: TIMEOUT_MS },
+    );
+    return response.data;
+  } catch (err) {
+    if (err.response) {
+      const message = err.response.data?.message || 'ai-service mengembalikan error';
+      throw new AIServiceError(message, err.response.status);
+    }
+    throw new AIServiceError(
+      `Tidak bisa terhubung ke ai-service: ${err.message}. Guru bisa edit manual.`,
+      503,
+    );
+  }
+}
+
 /**
  * Cek health ai-service (dipakai di dashboard guru / monitoring sederhana).
  */
@@ -80,6 +100,7 @@ async function checkHealth() {
 
 module.exports = {
   generateMateri,
+  generateVariant,
   checkHealth,
   AIServiceError,
 };

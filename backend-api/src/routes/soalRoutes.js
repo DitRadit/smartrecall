@@ -13,6 +13,9 @@ router.post('/submit', requireAuth, soalController.submitQuiz);
 // GET  /soal/riwayat/:siswa_id (siswa/guru) - riwayat percobaan kuis
 router.get('/riwayat/:siswa_id', requireAuth, soalController.getRiwayatKuis);
 
+// POST /soal/materi/:id/regenerate (guru) - generate ulang semua bank soal 1 materi
+router.post('/materi/:id/regenerate', requireAuth, requireRole('guru'), soalController.regenerateSoalByMateri);
+
 // PUT /soal/:id (guru) - edit soal kuis
 router.put('/:id', requireAuth, requireRole('guru'), soalController.updateSoal);
 

@@ -64,7 +64,7 @@ export default function UploadMateri() {
     <div className="max-w-5xl mx-auto px-container-padding py-stack-md">
       <h2 className="text-headline-lg text-primary">Upload Materi Pembelajaran</h2>
       <p className="text-body-md text-on-surface-variant mt-1 mb-6">
-        Cukup unggah PDF materi — flashcard, rangkuman, dan bank soal akan otomatis dibuatkan AI sekaligus.
+        Cukup unggah PDF materi — flashcard, rangkuman, bank soal, dan PPT opsional akan dibuatkan AI.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-6">
@@ -132,7 +132,7 @@ export default function UploadMateri() {
             <span>
               <span className="block text-label-md text-on-surface">Generate PPT dari materi ini</span>
               <span className="block text-label-sm text-on-surface-variant mt-1">
-                Opsional. AI akan membuat slide rangkuman dan poin-poin penting memakai template PPT yang sudah disediakan.
+                Opsional. Setelah proses background selesai, tombol download PPT muncul di dashboard dan halaman review materi.
               </span>
             </span>
           </label>

@@ -24,6 +24,12 @@ def test_preprocess_for_generation_truncates_long_text():
     assert len(result) <= 100
 
 
+def test_preprocess_for_generation_default_tidak_memotong_teks_panjang():
+    long_text = "anatomi " * 15000
+    result = preprocess_for_generation(long_text)
+    assert len(result) == len(clean_text(long_text))
+
+
 def test_extract_keywords_returns_list():
     text = "Sekolah di wilayah 3T mengalami keterbatasan internet dan listrik yang stabil."
     keywords = extract_keywords(text, max_keywords=5)

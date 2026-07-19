@@ -23,6 +23,8 @@ export default function ReviewFlashcard() {
   const [flashcards, setFlashcards] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [selectedScore, setSelectedScore] = useState(null);
+  const [submittingScore, setSubmittingScore] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
 
@@ -51,22 +53,35 @@ export default function ReviewFlashcard() {
     const current = flashcards[currentIndex];
     if (!current) return;
 
-    const result = await submitReviewWithFallback({
-      flashcard_id: current.id,
-      skor_kualitas: skor,
-    });
+    setSubmittingScore(true);
+    try {
+      const result = await submitReviewWithFallback({
+        flashcard_id: current.id,
+        skor_kualitas: skor,
+      });
 
-    setSubmitMessage(
-      result.synced
-        ? 'Skor tersimpan.'
-        : 'Koneksi terputus — skor disimpan di antrian lokal dan akan otomatis dikirim saat koneksi kembali.'
-    );
+      setSelectedScore(skor);
+      setShowAnswer(true);
+      setSubmitMessage(
+        result.synced
+          ? 'Skor tersimpan.'
+          : 'Koneksi terputus — skor disimpan di antrian lokal dan akan otomatis dikirim saat koneksi kembali.'
+      );
+    } catch (err) {
+      setSubmitMessage('Gagal menyimpan skor. Silakan coba lagi.');
+    } finally {
+      setSubmittingScore(false);
+    }
+  }
 
+  function goToNextCard() {
     setShowAnswer(false);
+    setSelectedScore(null);
+    setSubmitMessage('');
     if (currentIndex + 1 < flashcards.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      setTimeout(() => navigate('/siswa/materi'), 1500);
+      navigate('/siswa/materi');
     }
   }
 
@@ -101,32 +116,45 @@ export default function ReviewFlashcard() {
         <div className="bg-surface-container-lowest border border-outline-variant border-t-4 border-t-secondary-container rounded-xl p-6 min-h-[280px] flex flex-col items-center text-center">
           <span className="material-symbols-outlined text-secondary text-[40px] mb-4">lightbulb</span>
           <h3 className="text-headline-md text-primary mb-3">{current.pertanyaan}</h3>
-          {showAnswer && <p className="text-body-md text-on-surface-variant">{current.jawaban}</p>}
+          {showAnswer && (
+            <>
+              <p className="text-label-sm text-on-surface-variant uppercase tracking-wide mb-2">Jawaban</p>
+              <p className="text-body-md text-on-surface-variant">{current.jawaban}</p>
+            </>
+          )}
         </div>
 
         <div className="mt-6">
           {!showAnswer ? (
-            <button
-              onClick={() => setShowAnswer(true)}
-              className="w-full h-touch-target-min bg-secondary-container text-on-secondary-container rounded-xl text-label-md flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform"
-            >
-              <span className="material-symbols-outlined">visibility</span>
-              Tampilkan Jawaban
-            </button>
-          ) : (
             <div>
-              <p className="text-body-md text-on-surface-variant text-center mb-3">Seberapa yakin jawabanmu benar?</p>
+              <p className="text-body-md text-on-surface-variant text-center mb-3">
+                Sebelum melihat jawaban, seberapa yakin jawabanmu benar?
+              </p>
               <div className="grid grid-cols-6 gap-2">
                 {[0, 1, 2, 3, 4, 5].map((skor) => (
                   <button
                     key={skor}
                     onClick={() => handleSubmitScore(skor)}
-                    className="h-touch-target-min rounded-lg border border-outline-variant text-label-md text-on-surface hover:bg-primary hover:text-on-primary hover:border-primary transition-colors"
+                    disabled={submittingScore}
+                    className="h-touch-target-min rounded-lg border border-outline-variant text-label-md text-on-surface hover:bg-primary hover:text-on-primary hover:border-primary transition-colors disabled:opacity-50"
                   >
                     {skor}
                   </button>
                 ))}
               </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-body-md text-on-surface-variant text-center mb-3">
+                Tingkat yakin kamu: <span className="font-bold text-primary">{selectedScore}</span>
+              </p>
+              <button
+                onClick={goToNextCard}
+                className="w-full h-touch-target-min bg-secondary-container text-on-secondary-container rounded-xl text-label-md flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform"
+              >
+                {currentIndex + 1 < flashcards.length ? 'Kartu Berikutnya' : 'Selesai'}
+                <span className="material-symbols-outlined">chevron_right</span>
+              </button>
             </div>
           )}
         </div>

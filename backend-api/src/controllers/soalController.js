@@ -8,6 +8,31 @@
  */
 
 const prisma = require('../config/db');
+const aiServiceClient = require('../services/aiServiceClient');
+
+const OPSI_LABELS = ['A', 'B', 'C', 'D'];
+
+function normalizeSoalCandidates(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.items)) return parsed.items;
+  if (Array.isArray(parsed?.soal)) return parsed.soal;
+  if (Array.isArray(parsed?.bank_soal)) return parsed.bank_soal;
+  if (Array.isArray(parsed?.bankSoal)) return parsed.bankSoal;
+  if (Array.isArray(parsed?.questions)) return parsed.questions;
+  if (parsed?.pertanyaan || parsed?.question) return [parsed];
+  return [];
+}
+
+function normalizeSoalItem(item) {
+  const pertanyaan = item?.pertanyaan || item?.question || item?.soal || '';
+  const opsiJawaban = item?.opsi_jawaban || item?.opsiJawaban || item?.options || item?.pilihan || item?.choices || [];
+  const jawabanBenar = item?.jawaban_benar || item?.jawabanBenar || item?.correct_answer || item?.answer || item?.kunci || '';
+  return {
+    pertanyaan,
+    opsi_jawaban: Array.isArray(opsiJawaban) ? opsiJawaban : [],
+    jawaban_benar: String(jawabanBenar).trim().toUpperCase().slice(0, 1),
+  };
+}
 
 /**
  * GET /soal/materi/:id
@@ -73,7 +98,19 @@ async function submitQuiz(req, res) {
       const soal = soalList.find((s) => s.id === parseInt(j.soal_id, 10));
       const benar = !!soal && soal.jawabanBenar === j.jawaban_dipilih;
       if (benar) skorBenar += 1;
-      return { soal_id: j.soal_id, jawaban_dipilih: j.jawaban_dipilih, benar };
+      const opsiJawaban = soal ? JSON.parse(soal.opsiJawaban || '[]') : [];
+      const selectedIndex = OPSI_LABELS.indexOf(j.jawaban_dipilih);
+      const correctIndex = soal ? OPSI_LABELS.indexOf(soal.jawabanBenar) : -1;
+      return {
+        soal_id: j.soal_id,
+        pertanyaan: soal?.pertanyaan || '',
+        opsi_jawaban: opsiJawaban,
+        jawaban_dipilih: j.jawaban_dipilih,
+        jawaban_dipilih_teks: selectedIndex >= 0 ? opsiJawaban[selectedIndex] || '' : '',
+        jawaban_benar: soal?.jawabanBenar || null,
+        jawaban_benar_teks: correctIndex >= 0 ? opsiJawaban[correctIndex] || '' : '',
+        benar,
+      };
     });
 
     const attempt = await prisma.quizAttempt.create({
@@ -199,4 +236,74 @@ async function deleteSoal(req, res) {
   }
 }
 
-module.exports = { getSoalByMateri, submitQuiz, getRiwayatKuis, updateSoal, deleteSoal };
+async function regenerateSoalByMateri(req, res) {
+  try {
+    const materiId = parseInt(req.params.id, 10);
+    const materi = await prisma.materi.findFirst({
+      where: { id: materiId, guruId: req.user.id },
+      include: { bankSoal: { orderBy: { id: 'asc' } } },
+    });
+
+    if (!materi) {
+      return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
+    }
+    if (!materi.bankSoal.length) {
+      return res.status(400).json({ error: 'bad_request', message: 'Belum ada bank soal untuk digenerate ulang' });
+    }
+
+    const result = await aiServiceClient.generateVariant('soal', {
+      judul_materi: materi.judul,
+      items: materi.bankSoal.map((s) => ({
+        pertanyaan: s.pertanyaan,
+        opsi_jawaban: JSON.parse(s.opsiJawaban || '[]'),
+        jawaban_benar: s.jawabanBenar,
+      })),
+    });
+    const parsed = result?.draft?.parsed;
+    const candidates = normalizeSoalCandidates(parsed);
+    const normalizedCandidates = candidates.map(normalizeSoalItem);
+    const validCandidates = normalizedCandidates.filter(
+      (item) =>
+        item?.pertanyaan &&
+        Array.isArray(item.opsi_jawaban) &&
+        item.opsi_jawaban.length === 4 &&
+        ['A', 'B', 'C', 'D'].includes(item.jawaban_benar),
+    );
+    if (validCandidates.length === 0) {
+      return res.status(502).json({ error: 'bad_ai_response', message: 'AI gagal menghasilkan bank soal pengganti yang valid' });
+    }
+
+    await prisma.$transaction(
+      materi.bankSoal.map((soal, index) => {
+        const candidate = validCandidates[index % validCandidates.length];
+        return prisma.bankSoal.update({
+          where: { id: soal.id },
+          data: {
+            pertanyaan: candidate.pertanyaan,
+            opsiJawaban: JSON.stringify(candidate.opsi_jawaban),
+            jawabanBenar: candidate.jawaban_benar,
+            status: 'draft',
+          },
+        });
+      }),
+    );
+
+    const soal = await prisma.bankSoal.findMany({ where: { materiId }, orderBy: { id: 'asc' } });
+    return res.status(200).json({ soal });
+  } catch (err) {
+    console.error('regenerateSoalByMateri error:', err);
+    return res.status(err.statusCode || 500).json({
+      error: err.name === 'AIServiceError' ? 'ai_service_error' : 'internal_error',
+      message: err.message || 'Gagal generate ulang semua bank soal',
+    });
+  }
+}
+
+module.exports = {
+  getSoalByMateri,
+  submitQuiz,
+  getRiwayatKuis,
+  updateSoal,
+  regenerateSoalByMateri,
+  deleteSoal,
+};

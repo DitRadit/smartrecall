@@ -6,7 +6,7 @@ bagian 6: frontend-web TIDAK BOLEH memanggil ai-service secara langsung).
 
 Alur (ARCHITECTURE.md bagian 3.1):
   backend-api -> POST /generate/materi (file PDF + jenis_konten)
-  ai-service: pdfplumber ekstrak teks -> Sastrawi preprocess -> Gemini API
+  ai-service: pdfplumber ekstrak teks -> Sastrawi preprocess -> NVIDIA NIM API
   ai-service kembalikan hasil draft ke backend-api
 """
 
@@ -19,7 +19,7 @@ from flask import Blueprint, request, jsonify, current_app
 
 from services.pdf_extractor import extract_text_from_pdf, PDFExtractionError
 from services.nlp_processor import preprocess_for_generation, extract_keywords
-from services.nim_client import generate_content, NIMAPIError
+from services.nim_client import generate_content, generate_variant, NIMAPIError
 from services.ppt_generator import generate_pptx
 from utils.file_utils import is_allowed_file, save_uploaded_file
 
@@ -31,7 +31,7 @@ VALID_JENIS_KONTEN = {"flashcard", "rangkuman", "soal", "all"}
 
 
 def _inter_request_delay_seconds() -> float:
-    return float(os.getenv("GEMINI_INTER_REQUEST_DELAY_SECONDS", "4"))
+    return float(os.getenv("AI_INTER_REQUEST_DELAY_SECONDS", "4"))
 
 
 def _generate_content_sequential(processed_text: str, jenis_list: list[str]):
@@ -147,7 +147,7 @@ def generate_materi():
         processed_text = preprocess_for_generation(raw_text)
         keywords = extract_keywords(raw_text)
 
-        # Saat generate PPT aktif, total call Gemini menjadi empat
+        # Saat generate PPT aktif, total call LLM menjadi empat
         # (flashcard/rangkuman/soal/PPT). Jalankan berurutan supaya tidak
         # langsung menabrak rate limit free tier.
         if should_generate_ppt:
@@ -155,7 +155,7 @@ def generate_materi():
         else:
             draft, errors = _generate_content_parallel(processed_text, jenis_list)
 
-        # Kalau SEMUA jenis gagal (mis. Gemini API down total), anggap request
+        # Kalau SEMUA jenis gagal (mis. NVIDIA NIM API down total), anggap request
         # gagal supaya backend-api mengarahkan guru ke fallback manual (FR-7).
         if all(v is None for v in draft.values()):
             raise NIMAPIError(errors.get(jenis_list[0], "Gagal generate semua jenis konten."))
@@ -192,7 +192,7 @@ def generate_materi():
         return jsonify({"status": "error", "message": str(e)}), 422
 
     except NIMAPIError as e:
-        logger.error("Gemini API error: %s", e)
+        logger.error("LLM provider error: %s", e)
         # 503: guru harus diarahkan ke fallback input manual (FR-7) oleh backend-api.
         return jsonify({"status": "error", "message": str(e)}), 503
 
@@ -213,3 +213,25 @@ def generate_materi():
 def generate_health():
     """Health-check khusus modul generate (terpisah dari /health utama)."""
     return jsonify({"status": "ok", "module": "generate"}), 200
+
+
+@generate_bp.route("/variant", methods=["POST"])
+def generate_variant_route():
+    body = request.get_json(silent=True) or {}
+    jenis_konten = str(body.get("jenis_konten", "")).strip().lower()
+    source_content = body.get("source_content")
+
+    if jenis_konten not in {"flashcard", "rangkuman", "soal"}:
+        return jsonify({"status": "error", "message": "jenis_konten harus flashcard, rangkuman, atau soal"}), 400
+    if not isinstance(source_content, dict):
+        return jsonify({"status": "error", "message": "source_content wajib berupa object JSON"}), 400
+
+    try:
+        result = generate_variant(source_content, jenis_konten)
+        return jsonify({"status": "success", "draft": result}), 200
+    except NIMAPIError as e:
+        logger.error("LLM provider error saat regenerate variant: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 503
+    except Exception as e:
+        logger.exception("Kesalahan tak terduga saat regenerate variant")
+        return jsonify({"status": "error", "message": f"Gagal generate ulang: {e}"}), 500

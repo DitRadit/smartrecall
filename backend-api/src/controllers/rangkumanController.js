@@ -9,6 +9,24 @@
  */
 
 const prisma = require('../config/db');
+const aiServiceClient = require('../services/aiServiceClient');
+
+function normalizeRangkumanBlocks(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.items)) return parsed.items;
+  if (Array.isArray(parsed?.blocks)) return parsed.blocks;
+  if (Array.isArray(parsed?.blok)) return parsed.blok;
+  if (Array.isArray(parsed?.konten)) return parsed.konten;
+  if (Array.isArray(parsed?.rangkuman)) return parsed.rangkuman;
+  if (typeof parsed === 'string' && parsed.trim()) {
+    return [{ type: 'paragraf', teks: parsed.trim() }];
+  }
+  if (parsed?.type) return [parsed];
+  if (parsed?.teks || parsed?.text) {
+    return [{ type: 'paragraf', teks: parsed.teks || parsed.text }];
+  }
+  return [];
+}
 
 /**
  * GET /rangkuman/materi/:id
@@ -121,4 +139,54 @@ async function deleteRangkuman(req, res) {
   }
 }
 
-module.exports = { getRangkumanByMateri, updateRangkuman, deleteRangkuman };
+async function regenerateRangkuman(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const rangkuman = await prisma.rangkuman.findUnique({
+      where: { id },
+      include: { materi: true },
+    });
+
+    if (!rangkuman) {
+      return res.status(404).json({ error: 'not_found', message: 'Rangkuman tidak ditemukan' });
+    }
+    if (rangkuman.materi.guruId !== req.user.id) {
+      return res.status(403).json({ error: 'forbidden', message: 'Anda tidak memiliki akses ke rangkuman ini' });
+    }
+
+    let blocks;
+    try {
+      blocks = JSON.parse(rangkuman.konten || '[]');
+    } catch (e) {
+      blocks = [{ type: 'paragraf', teks: rangkuman.konten }];
+    }
+
+    const result = await aiServiceClient.generateVariant('rangkuman', {
+      judul_materi: rangkuman.materi.judul,
+      konten: blocks,
+    });
+    const parsed = result?.draft?.parsed;
+    const newBlocks = normalizeRangkumanBlocks(parsed);
+    if (newBlocks.length === 0) {
+      return res.status(502).json({ error: 'bad_ai_response', message: 'AI gagal menghasilkan rangkuman pengganti yang valid' });
+    }
+
+    const updated = await prisma.rangkuman.update({
+      where: { id },
+      data: {
+        konten: JSON.stringify(newBlocks),
+        status: 'draft',
+      },
+    });
+
+    return res.status(200).json({ rangkuman: { id: updated.id, konten: updated.konten } });
+  } catch (err) {
+    console.error('regenerateRangkuman error:', err);
+    return res.status(err.statusCode || 500).json({
+      error: err.name === 'AIServiceError' ? 'ai_service_error' : 'internal_error',
+      message: err.message || 'Gagal generate ulang rangkuman',
+    });
+  }
+}
+
+module.exports = { getRangkumanByMateri, updateRangkuman, regenerateRangkuman, deleteRangkuman };

@@ -11,6 +11,9 @@ router.get('/materi/:id', requireAuth, flashcardController.getFlashcardsByMateri
 // POST /flashcard/manual (guru) — fallback wajib saat AI gagal/limit (FR-7)
 router.post('/manual', requireAuth, requireRole('guru'), flashcardController.createManualFlashcard);
 
+// POST /flashcard/materi/:id/regenerate (guru) - generate ulang semua flashcard 1 materi
+router.post('/materi/:id/regenerate', requireAuth, requireRole('guru'), flashcardController.regenerateFlashcardsByMateri);
+
 // PUT /flashcard/:id (guru) - edit flashcard
 router.put('/:id', requireAuth, requireRole('guru'), flashcardController.updateFlashcard);
 

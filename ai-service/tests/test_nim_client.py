@@ -229,3 +229,59 @@ def test_parse_llm_json_memperbaiki_value_string_tanpa_kutip():
         {"pertanyaan": "Apa itu fotosintesis?", "jawaban": "Proses tumbuhan membuat makanan"},
         {"pertanyaan": "Apa hasil fotosintesis?", "jawaban": "Oksigen dan glukosa"},
     ]
+
+
+def test_build_prompt_melarang_metadata_buku_dan_undang_undang():
+    prompt = nim_client._build_prompt("BAB 1 Anatomi tubuh manusia", "flashcard")
+
+    assert "Gunakan HANYA konsep inti pembelajaran" in prompt
+    assert "undang-undang" in prompt
+    assert "ISBN" in prompt
+    assert "daftar isi" in prompt
+
+
+def test_parse_llm_json_membuang_flashcard_noise_non_materi():
+    content = (
+        '[{"pertanyaan": "Apa fungsi jantung?", "jawaban": "Memompa darah ke seluruh tubuh"}, '
+        '{"pertanyaan": "Apa isi Undang-Undang Hak Cipta?", "jawaban": "Sanksi pelanggaran pasal 113"}]'
+    )
+
+    result = nim_client._parse_llm_json(content, "flashcard")
+
+    assert result["parsed"] == [
+        {"pertanyaan": "Apa fungsi jantung?", "jawaban": "Memompa darah ke seluruh tubuh"}
+    ]
+
+
+def test_parse_llm_json_membuang_soal_noise_non_materi():
+    content = (
+        '[{"pertanyaan": "Bagian tulang apa yang melindungi otak?", '
+        '"opsi_jawaban": ["Tengkorak", "Rusuk", "Hasta", "Kering"], "jawaban_benar": "A"}, '
+        '{"pertanyaan": "Siapa penerbit buku ini?", '
+        '"opsi_jawaban": ["Penerbit A", "Jantung", "Paru-paru", "Tulang"], "jawaban_benar": "A"}]'
+    )
+
+    result = nim_client._parse_llm_json(content, "soal")
+
+    assert result["parsed"] == [
+        {
+            "pertanyaan": "Bagian tulang apa yang melindungi otak?",
+            "opsi_jawaban": ["Tengkorak", "Rusuk", "Hasta", "Kering"],
+            "jawaban_benar": "A",
+        }
+    ]
+
+
+def test_parse_llm_json_membuang_item_rangkuman_noise_non_materi():
+    content = (
+        '[{"type": "paragraf", "teks": "Sistem rangka memberi bentuk dan menopang tubuh."}, '
+        '{"type": "list", "items": ["Tulang melindungi organ penting.", "ISBN adalah nomor buku."]}, '
+        '{"type": "paragraf", "teks": "Hak cipta dilindungi undang-undang."}]'
+    )
+
+    result = nim_client._parse_llm_json(content, "rangkuman")
+
+    assert result["parsed"] == [
+        {"type": "paragraf", "teks": "Sistem rangka memberi bentuk dan menopang tubuh."},
+        {"type": "list", "items": ["Tulang melindungi organ penting."]},
+    ]

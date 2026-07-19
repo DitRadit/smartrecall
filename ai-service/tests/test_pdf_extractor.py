@@ -28,6 +28,12 @@ def test_should_skip_page_copyright():
     publisher_text = "Penerbit CV. Media Sains Indonesia\nAnggota IKAPI"
     assert _should_skip_page(publisher_text, 4) is True
 
+    rights_text = "Hak cipta dilindungi undang-undang\nDilarang memperbanyak isi buku tanpa izin tertulis"
+    assert _should_skip_page(rights_text, 2) is True
+
+    book_metadata_text = "Editor: A. Sari\nDesain Sampul: Tim Kreatif\nE-ISBN: 978-623-000-000-0"
+    assert _should_skip_page(book_metadata_text, 5) is True
+
 
 def test_should_skip_page_preface_and_toc():
     preface_text = "PRAKATA\nPuji dan syukur saya panjatkan..."
@@ -59,4 +65,3 @@ def test_should_not_skip_copyright_in_later_pages():
     # Jika kata kunci hak cipta muncul di halaman belakang (misalnya bab PPKn tentang Hak Cipta), jangan di-skip.
     civic_lesson_text = "Pembahasan Hak Cipta di Indonesia\nHari ini kita belajar tentang hak cipta..."
     assert _should_skip_page(civic_lesson_text, 25) is False
-

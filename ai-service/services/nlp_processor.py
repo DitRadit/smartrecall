@@ -4,7 +4,7 @@ nlp_processor.py - Preprocessing NLP Bahasa Indonesia menggunakan Sastrawi.
 Tanggung jawab:
 - Membersihkan teks hasil ekstraksi PDF (whitespace, karakter aneh)
 - Stopword removal & stemming ringan sebagai preprocessing sebelum teks
-  dikirim ke Gemini API (membantu memangkas token & noise)
+  dikirim ke provider LLM (membantu memangkas token & noise)
 
 Catatan: preprocessing ini TIDAK menggantikan teks asli yang dikirim ke LLM
 untuk generate konten (LLM tetap butuh teks yang natural, bukan hasil stem
@@ -14,6 +14,7 @@ analisis kata kunci / ringkasan pendukung, bukan untuk merusak teks asli.
 
 import re
 import logging
+from typing import Optional
 
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
@@ -59,14 +60,14 @@ def extract_keywords(text: str, max_keywords: int = 20) -> list[str]:
     return [w for w, _ in sorted_words[:max_keywords]]
 
 
-def preprocess_for_generation(raw_text: str, max_chars: int = 12000) -> str:
+def preprocess_for_generation(raw_text: str, max_chars: Optional[int] = None) -> str:
     """
-    Preprocessing utama sebelum teks dikirim ke Gemini API.
-    Hanya membersihkan teks & memotong panjang (bukan stemming) supaya
+    Preprocessing utama sebelum teks dikirim ke provider LLM.
+    Hanya membersihkan teks tanpa stemming supaya
     konteks yang dikirim ke LLM tetap natural dan enak dibaca.
     """
     cleaned = clean_text(raw_text)
-    if len(cleaned) > max_chars:
+    if max_chars and len(cleaned) > max_chars:
         logger.info("Teks dipotong dari %s ke %s karakter sebelum dikirim ke LLM", len(cleaned), max_chars)
         cleaned = cleaned[:max_chars]
     return cleaned

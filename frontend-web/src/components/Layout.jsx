@@ -1,4 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../services/authContext';
 import InstallPrompt from './InstallPrompt';
 import BottomNav from './BottomNav';
@@ -11,10 +12,53 @@ import BottomNav from './BottomNav';
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
+  const [isPwaMode, setIsPwaMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  });
+  const homePath = user?.role === 'guru' ? '/guru/dashboard' : '/siswa/materi';
+  const showBackButton = Boolean(user && location.pathname !== homePath);
+  const showLogout = Boolean(user && !isOffline && !isPwaMode);
+
+  useEffect(() => {
+    function updateOnlineStatus() {
+      setIsOffline(!navigator.onLine);
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
+
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.('(display-mode: standalone)');
+    function updatePwaMode() {
+      setIsPwaMode(mediaQuery?.matches || window.navigator.standalone === true);
+    }
+
+    updatePwaMode();
+    mediaQuery?.addEventListener?.('change', updatePwaMode);
+    return () => mediaQuery?.removeEventListener?.('change', updatePwaMode);
+  }, []);
 
   function handleLogout() {
     logout();
     navigate('/login');
+  }
+
+  function handleBack() {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(homePath);
+    }
   }
 
   return (
@@ -23,19 +67,31 @@ export default function Layout({ children }) {
       {user && (
         <>
           <header className="flex justify-between items-center px-container-padding h-touch-target-min w-full bg-surface border-b border-outline-variant sticky top-0 z-30">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {showBackButton && (
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  aria-label="Kembali"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-primary active:scale-95 transition-all shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+                </button>
+              )}
               <span className="material-symbols-outlined text-primary">school</span>
-              <h1 className="font-headline-md text-headline-md font-bold text-primary">SmartRecall</h1>
+              <h1 className="font-headline-md text-headline-md font-bold text-primary truncate">SmartRecall</h1>
             </div>
             <div className="flex items-center gap-3">
               <span className="hidden sm:inline font-label-sm text-label-sm text-on-surface-variant">{user.nama}</span>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1 text-on-surface-variant hover:text-primary text-label-sm font-label-sm px-2 py-1"
-              >
-                <span className="material-symbols-outlined text-[20px]">logout</span>
-                Keluar
-              </button>
+              {showLogout && (
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1 text-on-surface-variant hover:text-primary text-label-sm font-label-sm px-2 py-1"
+                >
+                  <span className="material-symbols-outlined text-[20px]">logout</span>
+                  Keluar
+                </button>
+              )}
             </div>
           </header>
 

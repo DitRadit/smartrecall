@@ -37,11 +37,13 @@ export default function ReviewDraftAI() {
   const [editingFlashcardId, setEditingFlashcardId] = useState(null);
   const [flashcardForm, setFlashcardForm] = useState({ pertanyaan: '', jawaban: '' });
   const [flashcardBusyId, setFlashcardBusyId] = useState(null);
+  const [flashcardBatchBusy, setFlashcardBatchBusy] = useState(false);
 
   // --- Bank soal edit state ---
   const [editingSoalId, setEditingSoalId] = useState(null);
   const [soalForm, setSoalForm] = useState({ pertanyaan: '', opsi_jawaban: ['', '', '', ''], jawaban_benar: 'A' });
   const [soalBusyId, setSoalBusyId] = useState(null);
+  const [soalBatchBusy, setSoalBatchBusy] = useState(false);
 
   // --- Rangkuman edit state ---
   const [editingRangkuman, setEditingRangkuman] = useState(false);
@@ -125,6 +127,21 @@ export default function ReviewDraftAI() {
     }
   }
 
+  async function regenerateAllFlashcardsHandler() {
+    if (!window.confirm('Generate ulang semua flashcard? Semua flashcard lama akan diganti dengan versi baru.')) return;
+    setFlashcardBatchBusy(true);
+    setError('');
+    try {
+      await api.post(`/flashcard/materi/${id}/regenerate`);
+      setEditingFlashcardId(null);
+      await loadDraft();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal generate ulang semua flashcard.');
+    } finally {
+      setFlashcardBatchBusy(false);
+    }
+  }
+
   // ================= Bank soal: edit & hapus =================
 
   function startEditSoal(s) {
@@ -174,6 +191,21 @@ export default function ReviewDraftAI() {
       setError(err.response?.data?.message || 'Gagal menghapus soal.');
     } finally {
       setSoalBusyId(null);
+    }
+  }
+
+  async function regenerateAllSoalHandler() {
+    if (!window.confirm('Generate ulang semua bank soal? Semua soal lama akan diganti dengan versi baru.')) return;
+    setSoalBatchBusy(true);
+    setError('');
+    try {
+      await api.post(`/soal/materi/${id}/regenerate`);
+      setEditingSoalId(null);
+      await loadDraft();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal generate ulang semua bank soal.');
+    } finally {
+      setSoalBatchBusy(false);
     }
   }
 
@@ -239,6 +271,21 @@ export default function ReviewDraftAI() {
     }
   }
 
+  async function regenerateRangkumanHandler() {
+    if (!window.confirm('Generate ulang rangkuman ini? Isi lama akan diganti dengan versi baru.')) return;
+    setRangkumanBusy(true);
+    setError('');
+    try {
+      await api.post(`/rangkuman/${materi.rangkuman.id}/regenerate`);
+      setEditingRangkuman(false);
+      await loadDraft();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal generate ulang rangkuman.');
+    } finally {
+      setRangkumanBusy(false);
+    }
+  }
+
   async function downloadPpt() {
     setError('');
     try {
@@ -297,7 +344,20 @@ export default function ReviewDraftAI() {
         <div className="space-y-6">
           {/* ================= FLASHCARD ================= */}
           <section>
-            <h3 className="text-headline-md text-primary mb-3">Flashcard Draft ({flashcardCount})</h3>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-headline-md text-primary">Flashcard Draft ({flashcardCount})</h3>
+              {flashcardCount > 0 && (
+                <button
+                  type="button"
+                  onClick={regenerateAllFlashcardsHandler}
+                  disabled={flashcardBatchBusy}
+                  className="text-secondary hover:underline text-label-sm inline-flex items-center gap-1 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[18px]">autorenew</span>
+                  {flashcardBatchBusy ? 'Generate...' : 'Generate Ulang Semua'}
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
               {(materi.flashcards || []).map((f) => {
                 const isEditing = editingFlashcardId === f.id;
@@ -353,6 +413,7 @@ export default function ReviewDraftAI() {
                           <button
                             type="button"
                             onClick={() => startEditFlashcard(f)}
+                            disabled={isBusy}
                             className="text-primary hover:underline text-label-sm inline-flex items-center gap-1"
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
@@ -385,7 +446,17 @@ export default function ReviewDraftAI() {
                 <div className="flex gap-4">
                   <button
                     type="button"
+                    onClick={regenerateRangkumanHandler}
+                    disabled={rangkumanBusy}
+                    className="text-secondary hover:underline text-label-sm inline-flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">autorenew</span>
+                    {rangkumanBusy ? 'Generate...' : 'Generate Ulang'}
+                  </button>
+                  <button
+                    type="button"
                     onClick={startEditRangkuman}
+                    disabled={rangkumanBusy}
                     className="text-primary hover:underline text-label-sm inline-flex items-center gap-1"
                   >
                     <span className="material-symbols-outlined text-[18px]">edit</span>
@@ -474,7 +545,20 @@ export default function ReviewDraftAI() {
 
           {/* ================= BANK SOAL ================= */}
           <section>
-            <h3 className="text-headline-md text-primary mb-3">Bank Soal Draft ({soalCount})</h3>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-headline-md text-primary">Bank Soal Draft ({soalCount})</h3>
+              {soalCount > 0 && (
+                <button
+                  type="button"
+                  onClick={regenerateAllSoalHandler}
+                  disabled={soalBatchBusy}
+                  className="text-secondary hover:underline text-label-sm inline-flex items-center gap-1 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[18px]">autorenew</span>
+                  {soalBatchBusy ? 'Generate...' : 'Generate Ulang Semua'}
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
               {(materi.bankSoal || []).map((s) => {
                 const isEditing = editingSoalId === s.id;
@@ -558,6 +642,7 @@ export default function ReviewDraftAI() {
                           <button
                             type="button"
                             onClick={() => startEditSoal(s)}
+                            disabled={isBusy}
                             className="text-primary hover:underline text-label-sm inline-flex items-center gap-1"
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
