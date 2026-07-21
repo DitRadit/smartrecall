@@ -9,10 +9,12 @@ PENTING (ARCHITECTURE.md bagian 7 & 8):
 """
 
 import os
+import re
 import json
 import logging
 import time
 import secrets
+import difflib
 import requests
 
 logger = logging.getLogger("ai-service.nim_client")
@@ -51,7 +53,7 @@ class NIMAPIError(Exception):
 
 
 def _get_config():
-    provider = os.getenv("AI_PROVIDER", "nvidia").strip().lower()
+    provider = os.getenv("AI_PROVIDER", "gemini").strip().lower()
     if provider not in {"gemini", "nvidia"}:
         raise NIMAPIError("AI_PROVIDER harus 'gemini' atau 'nvidia'.")
 
@@ -89,18 +91,25 @@ def _get_config():
     }
 
 
+SOURCE_GUARD = (
+    "Gunakan HANYA konsep inti pembelajaran dari isi bab/materi. "
+    "ABAIKAN dan JANGAN jadikan pertanyaan/rangkuman/soal dari metadata buku, "
+    "sampul, judul buku, nama penulis, penerbit, ISBN, hak cipta, undang-undang, "
+    "sanksi pelanggaran, kata pengantar, prakata, daftar isi, daftar pustaka, "
+    "tentang penulis, biodata penulis, nomor halaman, header/footer, atau informasi administratif. "
+    "Jika teks yang diberikan memuat bagian non-materi tersebut, anggap sebagai noise dan fokus pada "
+    "fakta, definisi, proses, struktur, fungsi, contoh, dan hubungan konsep yang benar-benar diajarkan. "
+)
+
+MIN_SOAL_COUNT = int(os.getenv("MIN_SOAL_COUNT", "10"))
+MAX_SOAL_TOPUP_ATTEMPTS = int(os.getenv("MAX_SOAL_TOPUP_ATTEMPTS", "2"))
+SOAL_TOPUP_DELAY_SECONDS = float(os.getenv("SOAL_TOPUP_DELAY_SECONDS", "2"))
+
+
 def _build_prompt(materi_text: str, jenis_konten: str) -> str:
     """Menyusun prompt sesuai jenis konten yang diminta (flashcard/rangkuman/soal)."""
 
-    source_guard = (
-        "Gunakan HANYA konsep inti pembelajaran dari isi bab/materi. "
-        "ABAIKAN dan JANGAN jadikan pertanyaan/rangkuman/soal dari metadata buku, "
-        "sampul, judul buku, nama penulis, penerbit, ISBN, hak cipta, undang-undang, "
-        "sanksi pelanggaran, kata pengantar, prakata, daftar isi, daftar pustaka, "
-        "tentang penulis, biodata penulis, nomor halaman, header/footer, atau informasi administratif. "
-        "Jika teks yang diberikan memuat bagian non-materi tersebut, anggap sebagai noise dan fokus pada "
-        "fakta, definisi, proses, struktur, fungsi, contoh, dan hubungan konsep yang benar-benar diajarkan. "
-    )
+    source_guard = SOURCE_GUARD
 
     instructions = {
         "flashcard": (
@@ -135,7 +144,7 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
         ),
         "soal": (
             source_guard +
-            "Buatkan 5-10 soal pilihan ganda (4 opsi: A/B/C/D) dalam Bahasa Indonesia berdasarkan "
+            "Buatkan 10-15 soal pilihan ganda (4 opsi: A/B/C/D) dalam Bahasa Indonesia berdasarkan "
             "materi berikut, untuk MENGUJI PEMAHAMAN siswa, bukan sekadar hafalan istilah. "
             "ATURAN PENTING supaya soal bervariasi dan tidak terasa berulang:\n"
             "1. JANGAN membuat semua soal dengan pola 'Apa yang dimaksud dengan <istilah>?' secara "
@@ -178,6 +187,48 @@ def _build_prompt(materi_text: str, jenis_konten: str) -> str:
         raise ValueError(f"jenis_konten tidak dikenal: {jenis_konten}")
 
     return f"{instruction}\n\nMateri:\n{materi_text}"
+
+
+def _build_soal_topup_prompt(materi_text: str, existing_items: list) -> str:
+    """
+    Dipakai saat hasil generate awal (SETELAH dedup) masih kurang dari
+    MIN_SOAL_COUNT. Daftar pertanyaan yang sudah ada disertakan secara
+    eksplisit supaya LLM tidak mengulang/memparafrase tipis soal yang
+    sudah ada -- diminta membuat soal dengan SUDUT yang benar-benar beda
+    (contoh penerapan, studi kasus, perbandingan konsep, urutan proses).
+    """
+    existing_questions = [
+        item.get("pertanyaan", "") for item in existing_items
+        if isinstance(item, dict) and item.get("pertanyaan")
+    ]
+    existing_list_text = "\n".join(f"- {q}" for q in existing_questions) or "(belum ada soal)"
+    jumlah_kurang = max(MIN_SOAL_COUNT - len(existing_questions), 3)
+
+    return (
+        SOURCE_GUARD +
+        f"Berikut daftar soal yang SUDAH ADA di draft (JANGAN membuat ulang atau "
+        f"memparafrase tipis salah satu dari ini):\n{existing_list_text}\n\n"
+        f"Buatkan {jumlah_kurang} soal pilihan ganda BARU (4 opsi: A/B/C/D) dalam Bahasa "
+        "Indonesia dari materi yang sama, yang MENGEKSPLORASI SUDUT BERBEDA dari soal "
+        "yang sudah ada di atas -- misalnya contoh penerapan konkret, membandingkan dua "
+        "konsep yang mirip, studi kasus singkat, atau urutan langkah/proses -- bukan "
+        "definisi ulang dari konsep yang sudah ditanyakan. Kalau materi memang tidak "
+        "cukup untuk soal baru yang relevan tanpa mengulang topik yang sama persis, buat "
+        "soal sebanyak yang wajar saja (boleh kurang dari jumlah yang diminta) -- JANGAN "
+        "memaksakan soal yang isinya sama seperti yang sudah ada hanya demi memenuhi jumlah. "
+        "ATURAN FORMAT sama seperti soal biasa: opsi jawaban harus berupa deskripsi/"
+        "penjelasan singkat yang relevan (bukan daftar istilah polos), jawaban benar tidak "
+        "boleh sekadar mengulang kata dari pertanyaan, dan SEBELUM menentukan jawaban_benar, "
+        "kerjakan/hitung dulu secara internal (taruh langkah singkatnya di field \"alasan\"). "
+        "Jawab HANYA dengan SATU JSON array TUNGGAL, format: "
+        '[{"pertanyaan": "...", "opsi_jawaban": ["...","...","...","..."], "alasan": "...", "jawaban_benar": "A"}]. '
+        "opsi_jawaban WAJIB tepat 4 string, jawaban_benar WAJIB salah satu dari 'A'/'B'/'C'/'D' "
+        "sesuai urutan indeks opsi_jawaban yang benar. WAJIB bungkus setiap key dan value "
+        "string JSON dengan tanda kutip ganda (\"). Jangan gunakan tanda kutip ganda di DALAM "
+        "isi teks -- pakai tanda kutip tunggal (') kalau perlu mengutip sesuatu. Jangan "
+        "tambahkan kalimat pembuka, penutup, atau teks lain di luar JSON.\n\n"
+        f"Materi:\n{materi_text}"
+    )
 
 
 def _build_variant_prompt(source_content: dict, jenis_konten: str) -> str:
@@ -257,11 +308,197 @@ def _is_non_materi_item(item) -> bool:
     return _contains_non_materi_noise(" ".join(_collect_strings(item)))
 
 
+DUPLICATE_SIMILARITY_THRESHOLD = 0.93
+# Ambang ini sengaja dibuat tinggi (bukan 0.8-an) supaya tidak salah membuang
+# soal yang KONSEPNYA beda tapi kebetulan boilerplate kalimatnya mirip, mis.
+# "Apa yang dimaksud dengan makhluk hidup?" vs "...ciri-ciri makhluk hidup?"
+# (ratio ~0.88, HARUS tetap dianggap 2 soal berbeda). Duplikat asli yang
+# teramati di draft guru selama ini adalah pengulangan verbatim/nyaris-verbatim
+# (ratio ~0.95-1.0), jadi ambang tinggi tetap menangkap kasus nyata tanpa
+# menghapus soal yang sah. Lebih aman melewatkan satu duplikat halus daripada
+# diam-diam membuang soal yang valid dari draft guru.
+
+
+def _normalize_question_text(text: str) -> str:
+    """Ratakan teks pertanyaan supaya perbandingan duplikat tidak terganggu
+    oleh perbedaan kapitalisasi/tanda baca/spasi ganda."""
+    text = (text or "").lower().strip()
+    text = re.sub(r"[^\w\s]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _is_near_duplicate_question(a: str, b: str, threshold: float = DUPLICATE_SIMILARITY_THRESHOLD) -> bool:
+    if not a or not b:
+        return False
+    return difflib.SequenceMatcher(None, a, b).ratio() >= threshold
+
+
+CROSS_FORMAT_ANSWER_THRESHOLD = 0.85
+CROSS_FORMAT_MIN_QUESTION_RELATION = 0.3
+MIN_ANSWER_LENGTH_FOR_CROSS_MATCH = 4
+# Dari pengujian: teks JAWABAN flashcard vs opsi jawaban_benar soal adalah
+# sinyal yang jauh lebih stabil untuk mendeteksi tumpang tindih flashcard-soal
+# dibanding teks pertanyaan saja -- flashcard & soal dibuat lewat prompt yang
+# strukturnya beda, jadi kalimat pertanyaannya wajar berbeda jauh walau
+# membahas fakta yang persis sama (rasio pertanyaan bisa 0.69-0.81 untuk
+# pasangan yang MEMANG sama topiknya, tumpang tindih dengan rasio pasangan
+# yang beda topik). Makanya threshold pertanyaan di sini sengaja dibuat
+# longgar (0.3) -- cuma jadi sanity-check tambahan, bukan sinyal utama.
+
+
+def _deduplicate_items(items: list) -> list:
+    """
+    Buang soal/flashcard yang field 'pertanyaan'-nya identik atau nyaris
+    identik (mis. LLM mengulang konsep yang sama dengan opsi pengecoh
+    berbeda -- pola yang teramati saat materi sumber hanya punya sedikit
+    konsep unik, lihat catatan di _build_prompt jenis_konten="soal").
+    Item pertama yang muncul dipertahankan, kemunculan berikutnya dibuang.
+    """
+    kept = []
+    kept_normalized = []
+    for item in items:
+        if not isinstance(item, dict) or "pertanyaan" not in item:
+            kept.append(item)
+            continue
+
+        normalized = _normalize_question_text(item.get("pertanyaan", ""))
+        if any(_is_near_duplicate_question(normalized, existing) for existing in kept_normalized):
+            logger.info(
+                "Membuang item duplikat/mirip dari draft AI: %r",
+                str(item.get("pertanyaan", ""))[:80],
+            )
+            continue
+
+        kept.append(item)
+        kept_normalized.append(normalized)
+
+    return kept
+
+
+def _get_correct_answer_text(soal_item: dict) -> str:
+    """Ambil teks opsi jawaban yang benar dari satu item soal, berdasarkan
+    huruf di jawaban_benar (A/B/C/D) yang dipetakan ke index opsi_jawaban."""
+    opsi = soal_item.get("opsi_jawaban")
+    jawaban_benar = str(soal_item.get("jawaban_benar", "")).strip().upper()
+    if isinstance(opsi, list) and jawaban_benar in ("A", "B", "C", "D"):
+        idx = "ABCD".index(jawaban_benar)
+        if idx < len(opsi):
+            return str(opsi[idx])
+    return ""
+
+
+def _is_cross_format_duplicate(flashcard_item: dict, soal_item: dict) -> bool:
+    """Cek apakah satu flashcard & satu soal membahas fakta yang persis sama
+    (lihat catatan di CROSS_FORMAT_ANSWER_THRESHOLD kenapa sinyal utamanya
+    teks jawaban, bukan teks pertanyaan)."""
+    fc_answer = _normalize_question_text(flashcard_item.get("jawaban", ""))
+    soal_answer = _normalize_question_text(_get_correct_answer_text(soal_item))
+
+    if len(fc_answer) < MIN_ANSWER_LENGTH_FOR_CROSS_MATCH or len(soal_answer) < MIN_ANSWER_LENGTH_FOR_CROSS_MATCH:
+        # Jawaban terlalu pendek/generik (mis. "ya", "ada") -- terlalu berisiko
+        # false positive kalau dipakai sebagai sinyal, jangan dicocokkan.
+        return False
+
+    if not _is_near_duplicate_question(fc_answer, soal_answer, CROSS_FORMAT_ANSWER_THRESHOLD):
+        return False
+
+    # Sanity-check longgar: pertanyaannya minimal harus sedikit berhubungan,
+    # supaya jawaban pendek yang kebetulan sama antar topik tak berhubungan
+    # (mis. dua soal berbeda yang jawabannya sama-sama satu angka) tidak ikut
+    # dianggap duplikat.
+    fc_question = _normalize_question_text(flashcard_item.get("pertanyaan", ""))
+    soal_question = _normalize_question_text(soal_item.get("pertanyaan", ""))
+    return _is_near_duplicate_question(fc_question, soal_question, CROSS_FORMAT_MIN_QUESTION_RELATION)
+
+
+def _deduplicate_soal_against_flashcard(soal_items: list, flashcard_items: list) -> list:
+    """Buang soal yang tumpang tindih dengan flashcard yang sudah ada."""
+    if not soal_items or not flashcard_items:
+        return soal_items
+
+    kept = []
+    for soal_item in soal_items:
+        if not isinstance(soal_item, dict):
+            kept.append(soal_item)
+            continue
+
+        overlaps = any(
+            isinstance(fc, dict) and _is_cross_format_duplicate(fc, soal_item)
+            for fc in flashcard_items
+        )
+        if overlaps:
+            logger.info(
+                "Membuang soal yang tumpang tindih dengan flashcard: %r",
+                str(soal_item.get("pertanyaan", ""))[:80],
+            )
+            continue
+
+        kept.append(soal_item)
+
+    return kept
+
+
+def reconcile_flashcard_and_soal(materi_text: str, draft: dict) -> dict:
+    """
+    Dipanggil dari routes/generate.py SETELAH flashcard & soal sama-sama
+    selesai digenerate (baik jalur paralel maupun sekuensial). Flashcard
+    untuk hafalan cepat, soal untuk uji pemahaman -- keduanya seharusnya
+    TIDAK menanyakan fakta yang persis sama. Soal yang tumpang tindih dengan
+    flashcard dibuang; kalau itu membuat jumlah soal < MIN_SOAL_COUNT,
+    top-up lagi (lihat _topup_soal_if_needed) supaya guru tetap dapat draft
+    yang cukup jumlahnya. Tidak mengubah draft sama sekali kalau salah satu
+    dari flashcard/soal gagal digenerate atau tidak berbentuk list --
+    reconciliation ini best-effort, bukan syarat wajib (ARCHITECTURE.md
+    prinsip #4: graceful degradation).
+    """
+    flashcard_result = draft.get("flashcard")
+    soal_result = draft.get("soal")
+
+    if not (isinstance(flashcard_result, dict) and isinstance(soal_result, dict)):
+        return draft
+
+    flashcard_items = flashcard_result.get("parsed")
+    soal_items = soal_result.get("parsed")
+
+    if not isinstance(flashcard_items, list) or not isinstance(soal_items, list):
+        return draft
+
+    reconciled_soal = _deduplicate_soal_against_flashcard(soal_items, flashcard_items)
+    removed_count = len(soal_items) - len(reconciled_soal)
+
+    if removed_count == 0:
+        return draft
+
+    logger.info(
+        "Reconcile flashcard-soal: %d soal dibuang karena tumpang tindih dengan flashcard.",
+        removed_count,
+    )
+
+    new_soal_result = dict(soal_result)
+    new_soal_result["parsed"] = reconciled_soal
+
+    if len(reconciled_soal) < MIN_SOAL_COUNT:
+        config = _get_config()
+        new_soal_result = _topup_soal_if_needed(config, materi_text, new_soal_result)
+        # Top-up bisa saja tanpa sengaja menghasilkan soal yang lagi-lagi
+        # tumpang tindih dengan flashcard -- saring sekali lagi (tanpa
+        # panggilan LLM baru) supaya hasil akhir tetap bersih.
+        new_soal_result["parsed"] = _deduplicate_soal_against_flashcard(
+            new_soal_result["parsed"], flashcard_items
+        )
+
+    new_draft = dict(draft)
+    new_draft["soal"] = new_soal_result
+    return new_draft
+
+
 def _filter_non_materi_items(parsed, jenis_konten: str):
     """
     Guardrail setelah JSON berhasil diparse. Model kadang tetap membuat item dari
     halaman copyright/metadata walau prompt sudah melarangnya; item seperti itu
-    tidak boleh masuk draft guru.
+    tidak boleh masuk draft guru. Untuk jenis_konten "soal"/"flashcard" guardrail
+    ini juga membuang item yang duplikat/nyaris duplikat (lihat _deduplicate_items).
     """
     if isinstance(parsed, list):
         if jenis_konten == "rangkuman":
@@ -279,7 +516,11 @@ def _filter_non_materi_items(parsed, jenis_konten: str):
                 elif not _is_non_materi_item(block):
                     filtered_blocks.append(block)
             return filtered_blocks
-        return [item for item in parsed if not _is_non_materi_item(item)]
+
+        filtered = [item for item in parsed if not _is_non_materi_item(item)]
+        if jenis_konten in {"soal", "flashcard"}:
+            filtered = _deduplicate_items(filtered)
+        return filtered
 
     if isinstance(parsed, dict) and _is_non_materi_item(parsed):
         return None
@@ -303,9 +544,76 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
     prompt = _build_prompt(materi_text, jenis_konten)
 
     if config["provider"] == "nvidia":
-        return _generate_content_nvidia(config, prompt, jenis_konten)
+        result = _generate_content_nvidia(config, prompt, jenis_konten)
+    else:
+        result = _generate_content_gemini(config, prompt, jenis_konten)
 
-    return _generate_content_gemini(config, prompt, jenis_konten)
+    if jenis_konten == "soal":
+        result = _topup_soal_if_needed(config, materi_text, result)
+
+    return result
+
+
+def _topup_soal_if_needed(config: dict, materi_text: str, result: dict) -> dict:
+    """
+    Kalau bank soal hasil generate awal (setelah dedup di _filter_non_materi_items)
+    masih kurang dari MIN_SOAL_COUNT, minta LLM generate soal TAMBAHAN yang
+    eksplisit diberi tahu soal-soal mana yang sudah ada (lihat
+    _build_soal_topup_prompt) supaya tidak mengulang -- bukan sekadar minta
+    ulang dari nol dengan angka lebih besar, karena itu yang tadinya bikin
+    soal berulang saat materi sumber tipis.
+
+    Berhenti lebih awal (sebelum MAX_SOAL_TOPUP_ATTEMPTS habis) begitu satu
+    putaran top-up tidak menambah soal unik sama sekali -- tandanya materi
+    memang sudah "habis", supaya tidak memanggil LLM sia-sia.
+    """
+    parsed = result.get("parsed")
+    if not isinstance(parsed, list):
+        return result
+
+    attempts = 0
+    while len(parsed) < MIN_SOAL_COUNT and attempts < MAX_SOAL_TOPUP_ATTEMPTS:
+        attempts += 1
+        logger.info(
+            "Bank soal baru %d/%d soal unik setelah dedup, minta top-up (percobaan %d/%d).",
+            len(parsed), MIN_SOAL_COUNT, attempts, MAX_SOAL_TOPUP_ATTEMPTS,
+        )
+        if SOAL_TOPUP_DELAY_SECONDS > 0:
+            time.sleep(SOAL_TOPUP_DELAY_SECONDS)
+
+        topup_prompt = _build_soal_topup_prompt(materi_text, parsed)
+        try:
+            if config["provider"] == "nvidia":
+                topup_result = _generate_content_nvidia(config, topup_prompt, "soal")
+            else:
+                topup_result = _generate_content_gemini(config, topup_prompt, "soal")
+        except NIMAPIError as e:
+            logger.warning("Gagal top-up bank soal (percobaan %d): %s", attempts, e)
+            break
+
+        new_items = topup_result.get("parsed")
+        if not isinstance(new_items, list) or not new_items:
+            logger.info("Top-up tidak menghasilkan soal baru yang valid, berhenti.")
+            break
+
+        merged = _deduplicate_items(parsed + new_items)
+        if len(merged) == len(parsed):
+            logger.info(
+                "Top-up tidak menghasilkan soal unik baru -- materi sumber kemungkinan "
+                "sudah habis konsepnya, berhenti supaya tidak memanggil LLM sia-sia."
+            )
+            break
+        parsed = merged
+
+    if len(parsed) < MIN_SOAL_COUNT:
+        logger.warning(
+            "Bank soal akhir cuma %d/%d soal unik walau sudah %d kali top-up -- materi "
+            "sumber kemungkinan terlalu tipis untuk %d soal yang benar-benar berbeda.",
+            len(parsed), MIN_SOAL_COUNT, attempts, MIN_SOAL_COUNT,
+        )
+
+    result["parsed"] = parsed
+    return result
 
 
 def generate_variant(source_content: dict, jenis_konten: str) -> dict:

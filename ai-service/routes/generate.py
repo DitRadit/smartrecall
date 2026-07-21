@@ -19,7 +19,7 @@ from flask import Blueprint, request, jsonify, current_app
 
 from services.pdf_extractor import extract_text_from_pdf, PDFExtractionError
 from services.nlp_processor import preprocess_for_generation, extract_keywords
-from services.nim_client import generate_content, generate_variant, NIMAPIError
+from services.nim_client import generate_content, generate_variant, reconcile_flashcard_and_soal, NIMAPIError
 from services.ppt_generator import generate_pptx
 from utils.file_utils import is_allowed_file, save_uploaded_file
 
@@ -159,6 +159,15 @@ def generate_materi():
         # gagal supaya backend-api mengarahkan guru ke fallback manual (FR-7).
         if all(v is None for v in draft.values()):
             raise NIMAPIError(errors.get(jenis_list[0], "Gagal generate semua jenis konten."))
+
+        # Flashcard & soal digenerate independen (paralel/sekuensial di atas)
+        # jadi bisa saja menanyakan fakta yang sama persis. Reconcile di sini
+        # setelah keduanya ada -- buang soal yang tumpang tindih dengan
+        # flashcard, top-up ulang kalau perlu. Hanya jalan kalau kedua jenis
+        # sama-sama diminta & sama-sama berhasil digenerate (jenis_konten
+        # tunggal seperti "soal" saja tidak ada flashcard untuk dibandingkan).
+        if "flashcard" in draft and "soal" in draft:
+            draft = reconcile_flashcard_and_soal(processed_text, draft)
 
         response_body = {
             "status": "success",
