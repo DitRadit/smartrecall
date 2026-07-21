@@ -143,7 +143,12 @@ def _generate_ppt_outline_nvidia(config: dict, prompt: str) -> list[dict]:
             last_error = NIMAPIError(f"Gagal menghubungi NVIDIA NIM API: {safe_error}")
             time.sleep(min(2 ** attempt, 8))
         except (KeyError, IndexError, json.JSONDecodeError) as e:
-            raise NIMAPIError(f"Response NVIDIA NIM untuk PPT tidak valid: {e}") from e
+            last_error = NIMAPIError(f"Response NVIDIA NIM untuk PPT tidak valid: {e}")
+            continue
+        except NIMAPIError as e:
+            logger.warning("NVIDIA NIM API gagal membuat PPT (percobaan %s): %s", attempt, e)
+            last_error = e
+            continue
 
     raise (last_error or NIMAPIError("Gagal membuat outline PPT setelah beberapa percobaan.")) from None
 
@@ -193,7 +198,12 @@ def _generate_ppt_outline_gemini(config: dict, prompt: str) -> list[dict]:
             last_error = NIMAPIError(f"Gagal menghubungi Gemini API: {safe_error}")
             time.sleep(min(2 ** attempt, 8))
         except (KeyError, IndexError, json.JSONDecodeError) as e:
-            raise NIMAPIError(f"Response Gemini untuk PPT tidak valid: {e}") from e
+            last_error = NIMAPIError(f"Response Gemini untuk PPT tidak valid: {e}")
+            continue
+        except NIMAPIError as e:
+            logger.warning("Gemini API gagal membuat PPT (percobaan %s): %s", attempt, e)
+            last_error = e
+            continue
 
     raise (last_error or NIMAPIError("Gagal membuat outline PPT setelah beberapa percobaan.")) from None
 

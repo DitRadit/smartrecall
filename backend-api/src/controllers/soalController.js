@@ -123,6 +123,11 @@ async function submitQuiz(req, res) {
       },
     });
 
+    await prisma.user.update({
+      where: { id: siswaId },
+      data: { lastSyncAt: new Date() },
+    });
+
     return res.status(201).json({
       attempt_id: attempt.id,
       skor_benar: skorBenar,

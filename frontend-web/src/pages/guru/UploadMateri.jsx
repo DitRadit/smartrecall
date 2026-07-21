@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 
 /**
@@ -19,6 +20,8 @@ export default function UploadMateri() {
   const [isDragging, setIsDragging] = useState(false);
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const groupId = searchParams.get('groupId');
 
   function handleDrop(e) {
     e.preventDefault();
@@ -39,6 +42,9 @@ export default function UploadMateri() {
     formData.append('file', file);
     formData.append('judul', judul);
     formData.append('generate_ppt', generatePpt ? 'true' : 'false');
+    if (groupId) {
+      formData.append('groupId', groupId);
+    }
 
     try {
       const response = await api.post('/materi/upload', formData, {

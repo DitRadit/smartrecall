@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import UploadMateri from './pages/guru/UploadMateri';
 import ReviewDraftAI from './pages/guru/ReviewDraftAI';
 import DashboardGuru from './pages/guru/DashboardGuru';
+import StatistikKelas from './pages/guru/StatistikKelas';
+import StatistikSiswa from './pages/guru/StatistikSiswa';
 import DaftarMateri from './pages/siswa/DaftarMateri';
 import ReviewFlashcard from './pages/siswa/ReviewFlashcard';
 import KerjakanSoal from './pages/siswa/KerjakanSoal';
@@ -56,6 +58,22 @@ export default function App() {
               element={
                 <PrivateRoute role="guru">
                   <ReviewDraftAI />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/guru/statistik"
+              element={
+                <PrivateRoute role="guru">
+                  <StatistikKelas />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/guru/statistik/siswa/:id"
+              element={
+                <PrivateRoute role="guru">
+                  <StatistikSiswa />
                 </PrivateRoute>
               }
             />

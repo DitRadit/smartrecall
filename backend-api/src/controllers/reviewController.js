@@ -79,6 +79,11 @@ async function submitReview(req, res) {
       data: { siswaId, flashcardId, skorKualitas: q },
     });
 
+    await prisma.user.update({
+      where: { id: siswaId },
+      data: { lastSyncAt: new Date() },
+    });
+
     return res.status(200).json({ progress });
   } catch (err) {
     console.error('submitReview error:', err);
