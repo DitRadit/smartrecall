@@ -34,6 +34,7 @@ model User {
   nis          String?  @unique // opsional, identifier administratif tambahan untuk siswa
   kelasId      String?  @map("kelas_id")
   createdAt    DateTime @default(now()) @map("created_at")
+  lastSyncAt   DateTime? @map("last_sync_at")
 
   // Relasi: guru yang membuat materi
   materiDiunggah Materi[] @relation("GuruMateri")

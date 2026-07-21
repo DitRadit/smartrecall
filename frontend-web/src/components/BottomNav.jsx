@@ -13,6 +13,7 @@ const NAV_ITEMS = {
   guru: [
     { to: '/guru/dashboard', icon: 'menu_book', label: 'Materi' },
     { to: '/guru/upload', icon: 'cloud_upload', label: 'Upload' },
+    { to: '/guru/statistik', icon: 'insights', label: 'Statistik' },
     { to: '/profil', icon: 'person', label: 'Profil' },
   ],
 };

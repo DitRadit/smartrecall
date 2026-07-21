@@ -20,6 +20,7 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const soalRoutes = require('./routes/soalRoutes');
 const rangkumanRoutes = require('./routes/rangkumanRoutes');
 const groupRoutes = require('./routes/groupRoutes');
+const statistikRoutes = require('./routes/statistikRoutes');
 const aiServiceClient = require('./services/aiServiceClient');
 
 const app = express();
@@ -71,6 +72,7 @@ app.use('/review', reviewRoutes);
 app.use('/soal', soalRoutes);
 app.use('/rangkuman', rangkumanRoutes);
 app.use('/groups', groupRoutes);
+app.use('/statistik', statistikRoutes);
 
 // --- 404 handler ---
 app.use((req, res) => {

@@ -113,6 +113,13 @@ export default function Layout({ children }) {
                     <span className="material-symbols-outlined">cloud_upload</span>
                     <span className="font-label-md text-label-md">Upload</span>
                   </Link>
+                  <Link
+                    to="/guru/statistik"
+                    className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                  >
+                    <span className="material-symbols-outlined">insights</span>
+                    <span className="font-label-md text-label-md">Statistik Kelas</span>
+                  </Link>
                 </nav>
               </aside>
               <main className="flex-1">{children}</main>
