@@ -12,6 +12,15 @@ export default function DashboardGuru() {
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
   const [deletingGroupId, setDeletingGroupId] = useState(null);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dropTargetId, setDropTargetId] = useState(null);
+  const [renamingGroup, setRenamingGroup] = useState(null);
+  const [renameGroupName, setRenameGroupName] = useState('');
+  const [renamingBusy, setRenamingBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const [currentParentId, setCurrentParentId] = useState(null);
   const [breadcrumb, setBreadcrumb] = useState([{ id: null, nama: 'Beranda' }]);
@@ -32,15 +41,21 @@ export default function DashboardGuru() {
       .catch((err) => setError(err.response?.data?.message || 'Gagal memuat daftar materi dan folder.'));
   }
 
-  async function handleCreateGroup() {
-    const nama = window.prompt('Masukkan nama folder baru:');
-    if (!nama?.trim()) return;
-    
+  async function handleCreateGroup(event) {
+    event.preventDefault();
+    if (!newGroupName.trim()) return;
+
+    setCreatingGroup(true);
+    setError('');
     try {
-      await api.post('/groups', { nama: nama.trim(), parentId: currentParentId });
+      await api.post('/groups', { nama: newGroupName.trim(), parentId: currentParentId });
+      setNewGroupName('');
+      setIsCreateGroupOpen(false);
       loadContents();
     } catch (err) {
-      alert(err.response?.data?.message || 'Gagal membuat folder');
+      setError(err.response?.data?.message || 'Gagal membuat folder');
+    } finally {
+      setCreatingGroup(false);
     }
   }
 
@@ -56,12 +71,64 @@ export default function DashboardGuru() {
     setCurrentParentId(target.id);
   }
 
-  async function handleDeleteGroup(group) {
-    const konfirmasi = window.confirm(
-      `Hapus folder "${group.nama}"? SELURUH isi (folder lain dan materi) di dalamnya akan ikut terhapus permanen.`,
-    );
-    if (!konfirmasi) return;
+  function handleBack() {
+    if (breadcrumb.length <= 1) return;
+    handleBreadcrumbClick(breadcrumb.length - 2);
+  }
 
+  function handleDragStart(event, item) {
+    setDraggedItem(item);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/json', JSON.stringify(item));
+  }
+
+  function readDraggedItem(event) {
+    if (draggedItem) return draggedItem;
+
+    try {
+      return JSON.parse(event.dataTransfer.getData('application/json'));
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function handleDragOver(event, targetGroupId) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDropTargetId(targetGroupId ?? 'root');
+  }
+
+  function handleDragLeave() {
+    setDropTargetId(null);
+  }
+
+  async function handleDrop(event, targetGroupId) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const item = readDraggedItem(event);
+    setDraggedItem(null);
+    setDropTargetId(null);
+    if (!item) return;
+
+    if (item.type === 'group' && item.id === targetGroupId) return;
+    if (item.type === 'group' && item.parentId === targetGroupId) return;
+    if (item.type === 'materi' && item.groupId === targetGroupId) return;
+
+    setError('');
+    try {
+      if (item.type === 'group') {
+        await api.put(`/groups/${item.id}`, { parentId: targetGroupId });
+      } else {
+        await api.put(`/materi/${item.id}/move`, { groupId: targetGroupId });
+      }
+      loadContents();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal memindahkan item.');
+    }
+  }
+
+  async function deleteGroup(group) {
     setDeletingGroupId(group.id);
     setError('');
     try {
@@ -74,24 +141,41 @@ export default function DashboardGuru() {
     }
   }
 
-  async function handleRenameGroup(group) {
-    const nama = window.prompt('Masukkan nama folder baru:', group.nama);
-    if (!nama?.trim() || nama.trim() === group.nama) return;
+  function handleDeleteGroup(group) {
+    setConfirmAction({
+      title: 'Hapus Folder',
+      message: `Folder "${group.nama}" beserta seluruh subfolder dan materi di dalamnya akan dihapus permanen.`,
+      confirmLabel: 'Hapus Folder',
+      tone: 'danger',
+      onConfirm: () => deleteGroup(group),
+    });
+  }
 
+  function handleRenameGroup(group) {
+    setRenamingGroup(group);
+    setRenameGroupName(group.nama);
+  }
+
+  async function submitRenameGroup(event) {
+    event.preventDefault();
+    const nama = renameGroupName.trim();
+    if (!renamingGroup || !nama || nama === renamingGroup.nama) return;
+
+    setRenamingBusy(true);
+    setError('');
     try {
-      await api.put(`/groups/${group.id}`, { nama: nama.trim() });
+      await api.put(`/groups/${renamingGroup.id}`, { nama });
+      setRenamingGroup(null);
+      setRenameGroupName('');
       loadContents();
     } catch (err) {
-      alert(err.response?.data?.message || 'Gagal mengubah nama folder');
+      setError(err.response?.data?.message || 'Gagal mengubah nama folder');
+    } finally {
+      setRenamingBusy(false);
     }
   }
 
-  async function handleDelete(materi) {
-    const konfirmasi = window.confirm(
-      `Hapus materi "${materi.judul}"? Seluruh flashcard, rangkuman, dan bank soal yang terhubung juga akan terhapus. Tindakan ini tidak bisa dibatalkan.`,
-    );
-    if (!konfirmasi) return;
-
+  async function deleteMateri(materi) {
     setDeletingId(materi.id);
     setError('');
     try {
@@ -102,6 +186,24 @@ export default function DashboardGuru() {
     } finally {
       setDeletingId(null);
     }
+  }
+
+  function handleDelete(materi) {
+    setConfirmAction({
+      title: 'Hapus Materi',
+      message: `Materi "${materi.judul}" beserta flashcard, rangkuman, dan bank soal yang terhubung akan dihapus permanen.`,
+      confirmLabel: 'Hapus Materi',
+      tone: 'danger',
+      onConfirm: () => deleteMateri(materi),
+    });
+  }
+
+  async function handleConfirmAction() {
+    const action = confirmAction;
+    if (!action) return;
+
+    setConfirmAction(null);
+    await action.onConfirm();
   }
 
   async function downloadPpt(materi) {
@@ -123,6 +225,164 @@ export default function DashboardGuru() {
 
   return (
     <div className="max-w-7xl mx-auto">
+      {isCreateGroupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 px-4">
+          <form
+            onSubmit={handleCreateGroup}
+            className="w-full max-w-md rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-headline-md text-on-surface font-bold">Buat Folder</h3>
+                <p className="text-label-sm text-on-surface-variant mt-1">
+                  Folder baru akan dibuat di lokasi yang sedang dibuka.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreateGroupOpen(false);
+                  setNewGroupName('');
+                }}
+                className="h-9 w-9 rounded-full hover:bg-surface-container flex items-center justify-center"
+                aria-label="Tutup dialog"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <label className="block mt-5 text-label-md text-on-surface" htmlFor="nama-folder">
+              Nama folder
+            </label>
+            <input
+              id="nama-folder"
+              autoFocus
+              value={newGroupName}
+              onChange={(event) => setNewGroupName(event.target.value)}
+              className="mt-2 w-full h-12 rounded-lg border border-outline-variant bg-background px-4 text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Contoh: Biologi Kelas 8"
+            />
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreateGroupOpen(false);
+                  setNewGroupName('');
+                }}
+                className="h-10 px-4 rounded-lg border border-outline-variant text-label-md text-on-surface-variant hover:bg-surface-container"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={!newGroupName.trim() || creatingGroup}
+                className="h-10 px-5 rounded-lg bg-primary text-on-primary text-label-md disabled:opacity-50"
+              >
+                {creatingGroup ? 'Membuat...' : 'Buat'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {renamingGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 px-4">
+          <form
+            onSubmit={submitRenameGroup}
+            className="w-full max-w-md rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-headline-md text-on-surface font-bold">Ganti Nama Folder</h3>
+                <p className="text-label-sm text-on-surface-variant mt-1">
+                  Perubahan nama tidak mengubah isi folder.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setRenamingGroup(null);
+                  setRenameGroupName('');
+                }}
+                className="h-9 w-9 rounded-full hover:bg-surface-container flex items-center justify-center"
+                aria-label="Tutup dialog"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <label className="block mt-5 text-label-md text-on-surface" htmlFor="rename-folder">
+              Nama folder
+            </label>
+            <input
+              id="rename-folder"
+              autoFocus
+              value={renameGroupName}
+              onChange={(event) => setRenameGroupName(event.target.value)}
+              className="mt-2 w-full h-12 rounded-lg border border-outline-variant bg-background px-4 text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setRenamingGroup(null);
+                  setRenameGroupName('');
+                }}
+                className="h-10 px-4 rounded-lg border border-outline-variant text-label-md text-on-surface-variant hover:bg-surface-container"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={!renameGroupName.trim() || renameGroupName.trim() === renamingGroup.nama || renamingBusy}
+                className="h-10 px-5 rounded-lg bg-primary text-on-primary text-label-md disabled:opacity-50"
+              >
+                {renamingBusy ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 px-4">
+          <div className="w-full max-w-md rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-error-container flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-error">warning</span>
+              </div>
+              <div>
+                <h3 className="text-headline-md text-on-surface font-bold">{confirmAction.title}</h3>
+                <p className="text-body-md text-on-surface-variant mt-2">{confirmAction.message}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="h-10 px-4 rounded-lg border border-outline-variant text-label-md text-on-surface-variant hover:bg-surface-container"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAction}
+                className={`h-10 px-5 rounded-lg text-label-md ${
+                  confirmAction.tone === 'danger'
+                    ? 'bg-error text-on-error'
+                    : 'bg-primary text-on-primary'
+                }`}
+              >
+                {confirmAction.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="flex flex-wrap justify-between items-center gap-4 px-container-padding py-stack-md">
         <div className="flex flex-col">
           <h2 className="text-headline-lg text-primary">Materi Saya</h2>
@@ -130,7 +390,7 @@ export default function DashboardGuru() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handleCreateGroup}
+            onClick={() => setIsCreateGroupOpen(true)}
             className="bg-secondary-container text-on-secondary-container h-touch-target-min px-6 rounded-xl flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
           >
             <span className="material-symbols-outlined">create_new_folder</span>
@@ -147,12 +407,31 @@ export default function DashboardGuru() {
       </header>
 
       <div className="px-container-padding pb-4">
+        {currentParentId && (
+          <button
+            type="button"
+            onClick={handleBack}
+            className="mb-3 inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-outline-variant text-label-md text-primary hover:bg-surface-container"
+          >
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            Kembali
+          </button>
+        )}
         <div className="flex items-center gap-2 text-label-md text-on-surface-variant bg-surface-container-lowest p-3 rounded-xl border border-outline-variant">
           {breadcrumb.map((crumb, index) => (
             <div key={crumb.id || 'root'} className="flex items-center gap-2">
               <button
                 onClick={() => handleBreadcrumbClick(index)}
-                className={`hover:underline ${index === breadcrumb.length - 1 ? 'font-bold text-primary' : 'text-on-surface-variant'}`}
+                onDragOver={(event) => handleDragOver(event, crumb.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(event) => handleDrop(event, crumb.id)}
+                className={`rounded-md px-2 py-1 hover:underline ${
+                  dropTargetId === (crumb.id ?? 'root')
+                    ? 'bg-primary text-on-primary'
+                    : index === breadcrumb.length - 1
+                      ? 'font-bold text-primary'
+                      : 'text-on-surface-variant'
+                }`}
               >
                 {crumb.nama}
               </button>
@@ -180,17 +459,35 @@ export default function DashboardGuru() {
                 
                 {/* RENDER FOLDERS (GROUPS) FIRST */}
                 {groupList.map((g) => (
-                  <tr key={`group-${g.id}`} className="hover:bg-surface-container-low transition-colors cursor-pointer" onClick={(e) => {
-                    // Mencegah klik navigasi kalau yang diklik adalah tombol aksi
-                    if (e.target.closest('.aksi-buttons')) return;
-                    handleNavigateFolder(g);
-                  }}>
+                  <tr
+                    key={`group-${g.id}`}
+                    draggable
+                    onDragStart={(event) => handleDragStart(event, { type: 'group', id: g.id, parentId: currentParentId })}
+                    onDragEnd={() => {
+                      setDraggedItem(null);
+                      setDropTargetId(null);
+                    }}
+                    onDragOver={(event) => handleDragOver(event, g.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(event) => handleDrop(event, g.id)}
+                    className={`hover:bg-surface-container-low transition-colors cursor-pointer ${
+                      dropTargetId === g.id ? 'bg-primary-container/40' : ''
+                    }`}
+                    onClick={(e) => {
+                      // Mencegah klik navigasi kalau yang diklik adalah tombol aksi
+                      if (e.target.closest('.aksi-buttons')) return;
+                      handleNavigateFolder(g);
+                    }}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center shrink-0">
                           <span className="material-symbols-outlined text-on-secondary-container">folder</span>
                         </div>
-                        <p className="text-label-md text-on-surface font-semibold">{g.nama}</p>
+                        <div className="min-w-0">
+                          <p className="text-label-md text-on-surface font-semibold truncate">{g.nama}</p>
+                          <p className="text-label-sm text-on-surface-variant">Tarik item ke folder ini untuk memindahkan</p>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -225,7 +522,16 @@ export default function DashboardGuru() {
 
                 {/* RENDER MATERI */}
                 {materiList.map((m) => (
-                  <tr key={`materi-${m.id}`} className="hover:bg-surface-container-low transition-colors">
+                  <tr
+                    key={`materi-${m.id}`}
+                    draggable
+                    onDragStart={(event) => handleDragStart(event, { type: 'materi', id: m.id, groupId: currentParentId })}
+                    onDragEnd={() => {
+                      setDraggedItem(null);
+                      setDropTargetId(null);
+                    }}
+                    className="hover:bg-surface-container-low transition-colors cursor-grab active:cursor-grabbing"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0">

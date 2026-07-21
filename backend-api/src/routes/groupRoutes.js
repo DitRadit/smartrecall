@@ -3,11 +3,11 @@ const router = express.Router();
 const groupController = require('../controllers/groupController');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-router.use(requireAuth, requireRole('guru'));
+router.use(requireAuth);
 
-router.post('/', groupController.createGroup);
 router.get('/', groupController.getGroupContents);
-router.put('/:id', groupController.updateGroup);
-router.delete('/:id', groupController.deleteGroup);
+router.post('/', requireRole('guru'), groupController.createGroup);
+router.put('/:id', requireRole('guru'), groupController.updateGroup);
+router.delete('/:id', requireRole('guru'), groupController.deleteGroup);
 
 module.exports = router;

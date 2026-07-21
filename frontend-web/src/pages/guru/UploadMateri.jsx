@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
+import AiProgressBar from '../../components/AiProgressBar';
 
 /**
  * UploadMateri.jsx - Guru upload PDF materi (FR-2, FR-3, FR-4).
@@ -20,8 +21,66 @@ export default function UploadMateri() {
   const [isDragging, setIsDragging] = useState(false);
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [aiProgress, setAiProgress] = useState(null);
   const [searchParams] = useSearchParams();
   const groupId = searchParams.get('groupId');
+
+  function formatProgress(progress) {
+    if (!progress) return null;
+
+    return {
+      title:
+        progress.status === 'done'
+          ? 'Generate AI selesai'
+          : progress.status === 'error'
+            ? 'Generate AI gagal'
+            : progress.status === 'queued'
+              ? 'Menunggu proses AI'
+              : 'AI sedang memproses materi',
+      description: progress.message || 'Proses AI sedang berjalan.',
+      progress: progress.progress || 0,
+      active: !['done', 'error', 'unknown'].includes(progress.status),
+      status: progress.status,
+    };
+  }
+
+  async function pollGenerateProgress(materiId) {
+    const maxAttempts = 240; // sekitar 8 menit, interval 2 detik
+
+    try {
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const response = await api.get(`/materi/${materiId}/generate-progress`);
+        const nextProgress = formatProgress(response.data.progress);
+        if (nextProgress) setAiProgress(nextProgress);
+
+        if (nextProgress?.status === 'done') {
+          setStatus({ type: 'success', message: 'Generate AI selesai. Materi siap direview di dashboard.' });
+          return;
+        }
+        if (nextProgress?.status === 'error') {
+          setStatus({
+            type: 'error',
+            message: nextProgress.description || 'Generate AI gagal. Gunakan input manual jika diperlukan.',
+          });
+          return;
+        }
+
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, 2000);
+        });
+      }
+
+      setStatus({
+        type: 'success',
+        message: 'Generate AI masih berjalan. Cek dashboard beberapa saat lagi.',
+      });
+    } catch (err) {
+      setStatus({
+        type: 'error',
+        message: err.response?.data?.message || 'Gagal memantau progress AI. Cek dashboard beberapa saat lagi.',
+      });
+    }
+  }
 
   function handleDrop(e) {
     e.preventDefault();
@@ -37,6 +96,12 @@ export default function UploadMateri() {
     }
     setLoading(true);
     setStatus(null);
+    setAiProgress({
+      title: 'Mengunggah materi ke server',
+      description: 'File PDF sedang dikirim. Setelah diterima, AI akan membuat flashcard, rangkuman, bank soal, dan PPT jika dipilih.',
+      progress: 35,
+      active: true,
+    });
 
     const formData = new FormData();
     formData.append('file', file);
@@ -51,10 +116,15 @@ export default function UploadMateri() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setStatus({ type: 'success', message: response.data.message });
+      setAiProgress(formatProgress(response.data.progress));
       setJudul('');
       setFile(null);
       setGeneratePpt(false);
+      if (response.data.materi?.id) {
+        pollGenerateProgress(response.data.materi.id);
+      }
     } catch (err) {
+      setAiProgress(null);
       setStatus({
         type: 'error',
         message:
@@ -151,6 +221,15 @@ export default function UploadMateri() {
             <span className="material-symbols-outlined">bolt</span>
             {loading ? 'Mengunggah...' : generatePpt ? 'Upload & Generate Semua + PPT' : 'Upload & Generate Semua'}
           </button>
+
+          {aiProgress && (
+            <AiProgressBar
+              title={aiProgress.title}
+              description={aiProgress.description}
+              progress={aiProgress.progress}
+              active={aiProgress.active}
+            />
+          )}
 
           {status && (
             <p className={status.type === 'error' ? 'error-text' : 'success-text'}>{status.message}</p>

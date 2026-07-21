@@ -14,12 +14,87 @@ const fs = require('fs/promises');
 const path = require('path');
 
 const GENERATED_PPT_DIR = path.join(__dirname, '..', '..', 'generated', 'ppt');
+const GENERATION_PROGRESS_TTL_MS = 30 * 60 * 1000;
+const generationProgress = new Map();
+
+function setGenerationProgress(materiId, update) {
+  const previous = generationProgress.get(materiId) || {};
+  generationProgress.set(materiId, {
+    materiId,
+    status: 'running',
+    progress: 5,
+    message: 'Menyiapkan proses AI...',
+    startedAt: previous.startedAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...previous,
+    ...update,
+  });
+}
+
+function getGenerationProgressSnapshot(materiId) {
+  const progress = generationProgress.get(materiId);
+  if (!progress) return null;
+
+  const updatedAt = new Date(progress.updatedAt).getTime();
+  if (Number.isFinite(updatedAt) && Date.now() - updatedAt > GENERATION_PROGRESS_TTL_MS) {
+    generationProgress.delete(materiId);
+    return null;
+  }
+
+  return progress;
+}
 
 function sanitizeFilename(value) {
   return String(value || 'materi')
     .replace(/[^a-zA-Z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80) || 'materi';
+}
+
+function normalizeFlashcardDraftItems(items) {
+  return items
+    .map((item) => ({
+      pertanyaan: String(item?.pertanyaan || '').trim(),
+      jawaban: String(item?.jawaban || '').trim(),
+    }))
+    .filter((item) => item.pertanyaan && item.jawaban);
+}
+
+function makeQuestionKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[?!.]+$/g, '')
+    .trim();
+}
+
+function dedupeByQuestion(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = makeQuestionKey(item.pertanyaan);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeSoalDraftItems(items) {
+  const validItems = items
+    .map((item) => {
+      const opsiJawaban = Array.isArray(item?.opsi_jawaban) ? item.opsi_jawaban : [];
+      return {
+        pertanyaan: String(item?.pertanyaan || '').trim(),
+        opsi_jawaban: opsiJawaban.map((opsi) => String(opsi || '').trim()).filter(Boolean),
+        jawaban_benar: String(item?.jawaban_benar || '').trim().toUpperCase().slice(0, 1),
+      };
+    })
+    .filter(
+      (item) =>
+        item.pertanyaan &&
+        item.opsi_jawaban.length >= 2 &&
+        ['A', 'B', 'C', 'D'].includes(item.jawaban_benar),
+    );
+  return dedupeByQuestion(validItems);
 }
 
 async function saveGeneratedPpt(materiId, judul, ppt) {
@@ -71,6 +146,12 @@ async function uploadMateri(req, res) {
       },
     });
 
+    setGenerationProgress(materi.id, {
+      status: 'queued',
+      progress: 10,
+      message: 'File diterima. Menunggu proses AI dimulai...',
+    });
+
     // Trigger job generate AI (async, tidak blocking response ke guru).
     // Kegagalan di sini TIDAK mengubah status materi menjadi error yang fatal --
     // guru tetap bisa input manual lewat /flashcard/manual (FR-7).
@@ -81,6 +162,7 @@ async function uploadMateri(req, res) {
         ? 'Materi diterima, proses generate AI dan PPT berjalan di background.'
         : 'Materi diterima, proses generate AI (flashcard, rangkuman, bank soal) berjalan di background.',
       materi: { id: materi.id, judul: materi.judul, status: materi.status },
+      progress: getGenerationProgressSnapshot(materi.id),
     });
   } catch (err) {
     console.error('uploadMateri error:', err);
@@ -98,6 +180,12 @@ async function uploadMateri(req, res) {
  */
 async function generateAIContentInBackground(materiId, fileBuffer, filename, options = {}) {
   try {
+    setGenerationProgress(materiId, {
+      status: 'running',
+      progress: 20,
+      message: 'Mengirim PDF ke AI service...',
+    });
+
     const result = await aiServiceClient.generateMateri(fileBuffer, filename, 'all', {
       generatePpt: Boolean(options.generatePpt),
       judul: options.judul,
@@ -105,6 +193,11 @@ async function generateAIContentInBackground(materiId, fileBuffer, filename, opt
     const draft = result?.draft;
 
     if (!draft) {
+      setGenerationProgress(materiId, {
+        status: 'error',
+        progress: 100,
+        message: 'AI service tidak mengembalikan draft.',
+      });
       console.warn(`[materi ${materiId}] ai-service tidak mengembalikan draft sama sekali.`);
       return;
     }
@@ -114,15 +207,26 @@ async function generateAIContentInBackground(materiId, fileBuffer, filename, opt
 
     const flashcardDraft = draft.flashcard?.parsed;
     if (Array.isArray(flashcardDraft) && flashcardDraft.length > 0) {
-      await prisma.flashcard.createMany({
-        data: flashcardDraft.map((item) => ({
-          materiId,
-          pertanyaan: item.pertanyaan,
-          jawaban: item.jawaban,
-          status: 'draft',
-        })),
+      setGenerationProgress(materiId, {
+        status: 'running',
+        progress: 45,
+        message: 'Menyimpan flashcard hasil AI...',
       });
-      savedJenis.push('flashcard');
+      const validFlashcards = normalizeFlashcardDraftItems(flashcardDraft);
+      if (validFlashcards.length > 0) {
+        await prisma.flashcard.createMany({
+          data: validFlashcards.map((item) => ({
+            materiId,
+            pertanyaan: item.pertanyaan,
+            jawaban: item.jawaban,
+            status: 'draft',
+          })),
+        });
+        savedJenis.push('flashcard');
+      } else {
+        failedJenis.push('flashcard');
+        console.warn(`[materi ${materiId}] flashcard parsed berupa array, tapi semua item invalid/kosong.`);
+      }
     } else if (draft.flashcard) {
       failedJenis.push('flashcard');
       console.warn(
@@ -133,16 +237,27 @@ async function generateAIContentInBackground(materiId, fileBuffer, filename, opt
 
     const soalDraft = draft.soal?.parsed;
     if (Array.isArray(soalDraft) && soalDraft.length > 0) {
-      await prisma.bankSoal.createMany({
-        data: soalDraft.map((item) => ({
-          materiId,
-          pertanyaan: item.pertanyaan,
-          opsiJawaban: JSON.stringify(item.opsi_jawaban || []),
-          jawabanBenar: item.jawaban_benar,
-          status: 'draft',
-        })),
+      setGenerationProgress(materiId, {
+        status: 'running',
+        progress: 65,
+        message: 'Menyimpan bank soal hasil AI...',
       });
-      savedJenis.push('soal');
+      const validSoal = normalizeSoalDraftItems(soalDraft);
+      if (validSoal.length > 0) {
+        await prisma.bankSoal.createMany({
+          data: validSoal.map((item) => ({
+            materiId,
+            pertanyaan: item.pertanyaan,
+            opsiJawaban: JSON.stringify(item.opsi_jawaban),
+            jawabanBenar: item.jawaban_benar,
+            status: 'draft',
+          })),
+        });
+        savedJenis.push('soal');
+      } else {
+        failedJenis.push('soal');
+        console.warn(`[materi ${materiId}] soal parsed berupa array, tapi semua item invalid/kosong.`);
+      }
     } else if (draft.soal) {
       // ai-service melaporkan status 200 (bukan errors) tapi parsed = null/bukan
       // array -- ini beda dari NIMAPIError, jadi tidak muncul di result.errors.
@@ -162,6 +277,11 @@ async function generateAIContentInBackground(materiId, fileBuffer, filename, opt
     // String, tidak perlu migration skema) -- frontend yang parse saat render.
     const rangkumanBlocks = draft.rangkuman?.parsed;
     if (Array.isArray(rangkumanBlocks) && rangkumanBlocks.length > 0) {
+      setGenerationProgress(materiId, {
+        status: 'running',
+        progress: 82,
+        message: 'Menyimpan rangkuman hasil AI...',
+      });
       const kontenJson = JSON.stringify(rangkumanBlocks);
       await prisma.rangkuman.upsert({
         where: { materiId },
@@ -182,6 +302,11 @@ async function generateAIContentInBackground(materiId, fileBuffer, filename, opt
     }
     if (result.ppt) {
       try {
+        setGenerationProgress(materiId, {
+          status: 'running',
+          progress: 92,
+          message: 'Menyimpan PPT hasil AI...',
+        });
         const pptFilename = await saveGeneratedPpt(materiId, options.judul || filename, result.ppt);
         if (pptFilename) savedJenis.push('ppt');
       } catch (pptErr) {
@@ -192,10 +317,56 @@ async function generateAIContentInBackground(materiId, fileBuffer, filename, opt
       console.warn(`[materi ${materiId}] sebagian jenis konten gagal disimpan (parsed invalid): ${failedJenis.join(', ')}.`);
     }
 
+    setGenerationProgress(materiId, {
+      status: 'done',
+      progress: 100,
+      message: `Generate AI selesai. Tersimpan: ${savedJenis.join(', ') || '(tidak ada)'}.`,
+      savedJenis,
+      failedJenis,
+    });
     console.log(`[materi ${materiId}] draft AI selesai diproses. Tersimpan: ${savedJenis.join(', ') || '(tidak ada)'}.`);
   } catch (err) {
+    setGenerationProgress(materiId, {
+      status: 'error',
+      progress: 100,
+      message: err.message || 'Generate AI gagal.',
+    });
     // Graceful degradation: log error, jangan lempar ke proses lain.
     console.error(`[materi ${materiId}] generate AI gagal total:`, err.message);
+  }
+}
+
+async function getGenerateProgress(req, res) {
+  try {
+    const materiId = parseInt(req.params.id, 10);
+    if (Number.isNaN(materiId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'ID materi tidak valid' });
+    }
+
+    const materi = await prisma.materi.findFirst({
+      where: { id: materiId, guruId: req.user.id },
+      select: { id: true, status: true },
+    });
+    if (!materi) {
+      return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
+    }
+
+    const progress = getGenerationProgressSnapshot(materiId);
+    if (progress) {
+      return res.status(200).json({ progress });
+    }
+
+    return res.status(200).json({
+      progress: {
+        materiId,
+        status: 'unknown',
+        progress: materi.status === 'published' ? 100 : 0,
+        message: 'Progress tidak tersedia. Jika server baru restart, cek halaman review materi.',
+      },
+    });
+  } catch (err) {
+    console.error('getGenerateProgress error:', err);
+    return res.status(500).json({ error: 'internal_error', message: 'Gagal mengambil progress generate AI' });
   }
 }
 
@@ -356,12 +527,64 @@ async function deleteMateri(req, res) {
   }
 }
 
+/**
+ * PUT /materi/:id/move
+ * Guru memindahkan materi ke folder lain atau ke root.
+ * Body: { groupId: number | null }
+ */
+async function moveMateri(req, res) {
+  try {
+    const materiId = parseInt(req.params.id, 10);
+    const parsedGroupId = req.body.groupId === undefined || req.body.groupId === null || req.body.groupId === ''
+      ? null
+      : parseInt(req.body.groupId, 10);
+
+    if (Number.isNaN(materiId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'ID materi tidak valid' });
+    }
+    if (Number.isNaN(parsedGroupId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'groupId tidak valid' });
+    }
+
+    const materi = await prisma.materi.findFirst({
+      where: { id: materiId, guruId: req.user.id },
+      select: { id: true },
+    });
+
+    if (!materi) {
+      return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
+    }
+
+    if (parsedGroupId) {
+      const group = await prisma.group.findFirst({
+        where: { id: parsedGroupId, guruId: req.user.id },
+        select: { id: true },
+      });
+      if (!group) {
+        return res.status(404).json({ error: 'not_found', message: 'Folder tujuan tidak ditemukan' });
+      }
+    }
+
+    await prisma.materi.update({
+      where: { id: materiId },
+      data: { groupId: parsedGroupId },
+    });
+
+    return res.status(200).json({ message: 'Materi berhasil dipindahkan' });
+  } catch (err) {
+    console.error('moveMateri error:', err);
+    return res.status(500).json({ error: 'internal_error', message: 'Gagal memindahkan materi' });
+  }
+}
+
 module.exports = {
   uploadMateri,
   listMateri,
   getMateriDraft,
+  getGenerateProgress,
   approveMateri,
   deleteMateri,
+  moveMateri,
   downloadMateriPpt,
   generateAIContentInBackground,
 };

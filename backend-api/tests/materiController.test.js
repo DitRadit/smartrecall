@@ -41,7 +41,7 @@ describe('generateAIContentInBackground', () => {
       draft: {
         flashcard: { parsed: [{ pertanyaan: 'Apa itu fotosintesis?', jawaban: 'Proses...' }] },
         rangkuman: { parsed: rangkumanBlocks },
-        soal: { parsed: [{ pertanyaan: '...', opsi_jawaban: ['A', 'B'], jawaban_benar: 'A' }] },
+        soal: { parsed: [{ pertanyaan: 'Apa itu fotosintesis?', opsi_jawaban: ['A', 'B'], jawaban_benar: 'A' }] },
       },
     });
 
@@ -127,6 +127,61 @@ describe('generateAIContentInBackground', () => {
     await generateAIContentInBackground(5, Buffer.from('fake-pdf'), 'materi5.pdf');
 
     expect(prisma.rangkuman.upsert).not.toHaveBeenCalled();
+  });
+
+  it('membuang item soal kosong dari hasil AI tanpa menggagalkan item valid', async () => {
+    aiServiceClient.generateMateri.mockResolvedValue({
+      status: 'success',
+      draft: {
+        flashcard: { parsed: [{ pertanyaan: 'Q', jawaban: 'A' }] },
+        rangkuman: { parsed: [{ type: 'paragraf', teks: 'Rangkuman valid.' }] },
+        soal: {
+          parsed: [
+            { pertanyaan: 'Soal valid?', opsi_jawaban: ['A', 'B', 'C', 'D'], jawaban_benar: 'A' },
+            { pertanyaan: undefined, opsi_jawaban: [], jawaban_benar: undefined },
+            {},
+          ],
+        },
+      },
+    });
+
+    await generateAIContentInBackground(7, Buffer.from('fake-pdf'), 'materi7.pdf');
+
+    expect(prisma.bankSoal.createMany).toHaveBeenCalledTimes(1);
+    expect(prisma.bankSoal.createMany.mock.calls[0][0].data).toEqual([
+      {
+        materiId: 7,
+        pertanyaan: 'Soal valid?',
+        opsiJawaban: JSON.stringify(['A', 'B', 'C', 'D']),
+        jawabanBenar: 'A',
+        status: 'draft',
+      },
+    ]);
+  });
+
+  it('membuang soal duplikat berdasarkan teks pertanyaan saat menyimpan hasil AI', async () => {
+    aiServiceClient.generateMateri.mockResolvedValue({
+      status: 'success',
+      draft: {
+        flashcard: { parsed: [{ pertanyaan: 'Q', jawaban: 'A' }] },
+        rangkuman: { parsed: [{ type: 'paragraf', teks: 'Rangkuman valid.' }] },
+        soal: {
+          parsed: [
+            { pertanyaan: 'Apa itu inspirasi?', opsi_jawaban: ['A', 'B', 'C', 'D'], jawaban_benar: 'A' },
+            { pertanyaan: 'Apa itu inspirasi ? ', opsi_jawaban: ['A2', 'B2', 'C2', 'D2'], jawaban_benar: 'B' },
+            { pertanyaan: 'Apa itu ekspirasi?', opsi_jawaban: ['A', 'B', 'C', 'D'], jawaban_benar: 'C' },
+          ],
+        },
+      },
+    });
+
+    await generateAIContentInBackground(8, Buffer.from('fake-pdf'), 'materi8.pdf');
+
+    expect(prisma.bankSoal.createMany).toHaveBeenCalledTimes(1);
+    expect(prisma.bankSoal.createMany.mock.calls[0][0].data.map((item) => item.pertanyaan)).toEqual([
+      'Apa itu inspirasi?',
+      'Apa itu ekspirasi?',
+    ]);
   });
 
   it('meminta dan menyimpan PPT jika opsi generatePpt aktif', async () => {

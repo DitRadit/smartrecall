@@ -1,5 +1,57 @@
 const prisma = require('../config/db');
 
+function parseOptionalId(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? NaN : parsed;
+}
+
+function collectAccessibleGroupIds(groups, publishedMateri) {
+  const groupById = new Map(groups.map((group) => [group.id, group]));
+  const accessibleIds = new Set();
+
+  for (const materi of publishedMateri) {
+    let groupId = materi.groupId;
+    while (groupId) {
+      if (accessibleIds.has(groupId)) break;
+      accessibleIds.add(groupId);
+      groupId = groupById.get(groupId)?.parentId || null;
+    }
+  }
+
+  return accessibleIds;
+}
+
+function selectMateriSummary() {
+  return { id: true, judul: true, status: true, pptFile: true, groupId: true, createdAt: true };
+}
+
+async function ensureOwnedParentGroup(parentId, guruId) {
+  if (!parentId) return null;
+
+  const parent = await prisma.group.findFirst({
+    where: { id: parentId, guruId },
+    select: { id: true, parentId: true },
+  });
+  return parent;
+}
+
+async function isDescendantGroup(groupId, maybeDescendantId) {
+  let currentId = maybeDescendantId;
+
+  while (currentId) {
+    if (currentId === groupId) return true;
+
+    const current = await prisma.group.findUnique({
+      where: { id: currentId },
+      select: { parentId: true },
+    });
+    currentId = current?.parentId || null;
+  }
+
+  return false;
+}
+
 /**
  * POST /groups
  * Membuat folder baru.
@@ -7,15 +59,26 @@ const prisma = require('../config/db');
 async function createGroup(req, res) {
   try {
     const { nama, parentId } = req.body;
+    const parsedParentId = parseOptionalId(parentId);
+
     if (!nama) {
       return res.status(400).json({ error: 'bad_request', message: 'Nama folder wajib diisi' });
+    }
+    if (Number.isNaN(parsedParentId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'parentId tidak valid' });
+    }
+    if (parsedParentId) {
+      const parent = await ensureOwnedParentGroup(parsedParentId, req.user.id);
+      if (!parent) {
+        return res.status(404).json({ error: 'not_found', message: 'Folder tujuan tidak ditemukan' });
+      }
     }
 
     const group = await prisma.group.create({
       data: {
         nama,
         guruId: req.user.id,
-        parentId: parentId ? parseInt(parentId, 10) : null,
+        parentId: parsedParentId,
       },
     });
 
@@ -33,7 +96,14 @@ async function createGroup(req, res) {
  */
 async function getGroupContents(req, res) {
   try {
-    const parentId = req.query.parentId ? parseInt(req.query.parentId, 10) : null;
+    const parentId = parseOptionalId(req.query.parentId);
+    if (Number.isNaN(parentId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'parentId tidak valid' });
+    }
+
+    if (req.user.role === 'siswa') {
+      return getStudentGroupContents(req, res, parentId);
+    }
 
     const [groups, materi] = await Promise.all([
       prisma.group.findMany({
@@ -49,14 +119,14 @@ async function getGroupContents(req, res) {
           groupId: parentId,
         },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, judul: true, status: true, pptFile: true, createdAt: true },
+        select: selectMateriSummary(),
       }),
     ]);
 
     // Jika masuk ke suatu folder, kirimkan juga data folder tsb untuk breadcrumb
     let currentGroup = null;
     if (parentId) {
-      currentGroup = await prisma.group.findUnique({
+      currentGroup = await prisma.group.findFirst({
         where: { id: parentId, guruId: req.user.id },
       });
       if (!currentGroup) {
@@ -71,6 +141,37 @@ async function getGroupContents(req, res) {
   }
 }
 
+async function getStudentGroupContents(req, res, parentId) {
+  const [allGroups, publishedMateri] = await Promise.all([
+    prisma.group.findMany({
+      select: { id: true, nama: true, parentId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.materi.findMany({
+      where: { status: 'published' },
+      orderBy: { createdAt: 'desc' },
+      select: selectMateriSummary(),
+    }),
+  ]);
+
+  const accessibleGroupIds = collectAccessibleGroupIds(allGroups, publishedMateri);
+
+  let currentGroup = null;
+  if (parentId) {
+    currentGroup = allGroups.find((group) => group.id === parentId && accessibleGroupIds.has(group.id)) || null;
+    if (!currentGroup) {
+      return res.status(404).json({ error: 'not_found', message: 'Folder tidak ditemukan' });
+    }
+  }
+
+  const groups = allGroups.filter(
+    (group) => group.parentId === parentId && accessibleGroupIds.has(group.id),
+  );
+  const materi = publishedMateri.filter((item) => item.groupId === parentId);
+
+  return res.status(200).json({ currentGroup, groups, materi });
+}
+
 /**
  * PUT /groups/:id
  * Mengubah nama folder.
@@ -78,22 +179,61 @@ async function getGroupContents(req, res) {
 async function updateGroup(req, res) {
   try {
     const { id } = req.params;
+    const groupId = parseInt(id, 10);
     const { nama } = req.body;
+    const hasParentId = Object.prototype.hasOwnProperty.call(req.body, 'parentId');
 
-    if (!nama) {
-      return res.status(400).json({ error: 'bad_request', message: 'Nama folder wajib diisi' });
+    if (Number.isNaN(groupId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'ID folder tidak valid' });
     }
 
-    const group = await prisma.group.updateMany({
-      where: { id: parseInt(id, 10), guruId: req.user.id },
-      data: { nama },
+    const existing = await prisma.group.findFirst({
+      where: { id: groupId, guruId: req.user.id },
+      select: { id: true },
     });
 
-    if (group.count === 0) {
+    if (!existing) {
       return res.status(404).json({ error: 'not_found', message: 'Folder tidak ditemukan atau Anda tidak memiliki akses' });
     }
 
-    return res.status(200).json({ message: 'Nama folder berhasil diubah' });
+    const data = {};
+    if (nama !== undefined) {
+      if (!nama?.trim()) {
+        return res.status(400).json({ error: 'bad_request', message: 'Nama folder wajib diisi' });
+      }
+      data.nama = nama.trim();
+    }
+
+    if (hasParentId) {
+      const parsedParentId = parseOptionalId(req.body.parentId);
+      if (Number.isNaN(parsedParentId)) {
+        return res.status(400).json({ error: 'bad_request', message: 'parentId tidak valid' });
+      }
+      if (parsedParentId === groupId) {
+        return res.status(400).json({ error: 'bad_request', message: 'Folder tidak bisa dipindah ke dirinya sendiri' });
+      }
+      if (parsedParentId) {
+        const parent = await ensureOwnedParentGroup(parsedParentId, req.user.id);
+        if (!parent) {
+          return res.status(404).json({ error: 'not_found', message: 'Folder tujuan tidak ditemukan' });
+        }
+        if (await isDescendantGroup(groupId, parsedParentId)) {
+          return res.status(400).json({ error: 'bad_request', message: 'Folder tidak bisa dipindah ke subfoldernya sendiri' });
+        }
+      }
+      data.parentId = parsedParentId;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'bad_request', message: 'Tidak ada perubahan yang dikirim' });
+    }
+
+    await prisma.group.update({
+      where: { id: groupId },
+      data,
+    });
+
+    return res.status(200).json({ message: 'Folder berhasil diperbarui' });
   } catch (err) {
     console.error('updateGroup error:', err);
     return res.status(500).json({ error: 'internal_error', message: 'Gagal mengubah folder' });

@@ -25,6 +25,12 @@ router.post('/upload', requireAuth, requireRole('guru'), upload.single('file'), 
 // GET /materi (siswa: published only, guru: milik sendiri)
 router.get('/', requireAuth, materiController.listMateri);
 
+// PUT /materi/:id/move (guru) - pindah materi ke folder lain/root
+router.put('/:id/move', requireAuth, requireRole('guru'), materiController.moveMateri);
+
+// GET /materi/:id/generate-progress (guru) - progress generate AI background
+router.get('/:id/generate-progress', requireAuth, requireRole('guru'), materiController.getGenerateProgress);
+
 // GET /materi/:id/draft (guru)
 router.get('/:id/draft', requireAuth, requireRole('guru'), materiController.getMateriDraft);
 

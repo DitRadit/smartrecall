@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
 import RangkumanBlocks from '../../components/RangkumanBlocks';
+import AiProgressBar from '../../components/AiProgressBar';
 
 /**
  * ReviewDraftAI.jsx - Guru mereview, mengedit, approve/reject draft AI (FR-6).
@@ -49,6 +50,8 @@ export default function ReviewDraftAI() {
   const [editingRangkuman, setEditingRangkuman] = useState(false);
   const [rangkumanBlocks, setRangkumanBlocks] = useState([]);
   const [rangkumanBusy, setRangkumanBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [aiProgress, setAiProgress] = useState(null);
 
   useEffect(() => {
     loadDraft();
@@ -113,8 +116,7 @@ export default function ReviewDraftAI() {
     }
   }
 
-  async function deleteFlashcardHandler(fId) {
-    if (!window.confirm('Hapus flashcard ini?')) return;
+  async function deleteFlashcard(fId) {
     setFlashcardBusyId(fId);
     setError('');
     try {
@@ -127,19 +129,45 @@ export default function ReviewDraftAI() {
     }
   }
 
-  async function regenerateAllFlashcardsHandler() {
-    if (!window.confirm('Generate ulang semua flashcard? Semua flashcard lama akan diganti dengan versi baru.')) return;
+  function deleteFlashcardHandler(fId) {
+    setConfirmAction({
+      title: 'Hapus Flashcard',
+      message: 'Flashcard ini akan dihapus dari materi.',
+      confirmLabel: 'Hapus',
+      tone: 'danger',
+      onConfirm: () => deleteFlashcard(fId),
+    });
+  }
+
+  async function regenerateAllFlashcards() {
     setFlashcardBatchBusy(true);
     setError('');
+    setAiProgress({
+      title: 'AI sedang generate ulang flashcard',
+      description: 'Pertanyaan dan jawaban lama sedang dianalisis untuk dibuatkan versi baru.',
+      progress: null,
+    });
     try {
       await api.post(`/flashcard/materi/${id}/regenerate`);
       setEditingFlashcardId(null);
       await loadDraft();
+      setAiProgress(null);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal generate ulang semua flashcard.');
+      setAiProgress(null);
     } finally {
       setFlashcardBatchBusy(false);
     }
+  }
+
+  function regenerateAllFlashcardsHandler() {
+    setConfirmAction({
+      title: 'Generate Ulang Flashcard',
+      message: 'Semua flashcard lama pada materi ini akan diganti dengan versi baru.',
+      confirmLabel: 'Generate Ulang',
+      tone: 'default',
+      onConfirm: regenerateAllFlashcards,
+    });
   }
 
   // ================= Bank soal: edit & hapus =================
@@ -180,8 +208,7 @@ export default function ReviewDraftAI() {
     }
   }
 
-  async function deleteSoalHandler(sId) {
-    if (!window.confirm('Hapus soal ini?')) return;
+  async function deleteSoal(sId) {
     setSoalBusyId(sId);
     setError('');
     try {
@@ -194,19 +221,45 @@ export default function ReviewDraftAI() {
     }
   }
 
-  async function regenerateAllSoalHandler() {
-    if (!window.confirm('Generate ulang semua bank soal? Semua soal lama akan diganti dengan versi baru.')) return;
+  function deleteSoalHandler(sId) {
+    setConfirmAction({
+      title: 'Hapus Soal',
+      message: 'Soal ini akan dihapus dari bank soal materi.',
+      confirmLabel: 'Hapus',
+      tone: 'danger',
+      onConfirm: () => deleteSoal(sId),
+    });
+  }
+
+  async function regenerateAllSoal() {
     setSoalBatchBusy(true);
     setError('');
+    setAiProgress({
+      title: 'AI sedang generate ulang bank soal',
+      description: 'Opsi jawaban dan kunci jawaban sedang disusun ulang.',
+      progress: null,
+    });
     try {
       await api.post(`/soal/materi/${id}/regenerate`);
       setEditingSoalId(null);
       await loadDraft();
+      setAiProgress(null);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal generate ulang semua bank soal.');
+      setAiProgress(null);
     } finally {
       setSoalBatchBusy(false);
     }
+  }
+
+  function regenerateAllSoalHandler() {
+    setConfirmAction({
+      title: 'Generate Ulang Bank Soal',
+      message: 'Semua soal lama pada materi ini akan diganti dengan versi baru.',
+      confirmLabel: 'Generate Ulang',
+      tone: 'default',
+      onConfirm: regenerateAllSoal,
+    });
   }
 
   // ================= Rangkuman: edit & hapus =================
@@ -256,8 +309,7 @@ export default function ReviewDraftAI() {
     }
   }
 
-  async function deleteRangkumanHandler() {
-    if (!window.confirm('Hapus rangkuman ini? Siswa tidak akan lagi bisa membacanya.')) return;
+  async function deleteRangkuman() {
     setRangkumanBusy(true);
     setError('');
     try {
@@ -271,19 +323,53 @@ export default function ReviewDraftAI() {
     }
   }
 
-  async function regenerateRangkumanHandler() {
-    if (!window.confirm('Generate ulang rangkuman ini? Isi lama akan diganti dengan versi baru.')) return;
+  function deleteRangkumanHandler() {
+    setConfirmAction({
+      title: 'Hapus Rangkuman',
+      message: 'Rangkuman ini akan dihapus dan siswa tidak akan lagi bisa membacanya.',
+      confirmLabel: 'Hapus',
+      tone: 'danger',
+      onConfirm: deleteRangkuman,
+    });
+  }
+
+  async function regenerateRangkuman() {
     setRangkumanBusy(true);
     setError('');
+    setAiProgress({
+      title: 'AI sedang generate ulang rangkuman',
+      description: 'Blok rangkuman lama sedang dirapikan menjadi versi baru.',
+      progress: null,
+    });
     try {
       await api.post(`/rangkuman/${materi.rangkuman.id}/regenerate`);
       setEditingRangkuman(false);
       await loadDraft();
+      setAiProgress(null);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal generate ulang rangkuman.');
+      setAiProgress(null);
     } finally {
       setRangkumanBusy(false);
     }
+  }
+
+  function regenerateRangkumanHandler() {
+    setConfirmAction({
+      title: 'Generate Ulang Rangkuman',
+      message: 'Isi rangkuman lama akan diganti dengan versi baru.',
+      confirmLabel: 'Generate Ulang',
+      tone: 'default',
+      onConfirm: regenerateRangkuman,
+    });
+  }
+
+  async function handleConfirmAction() {
+    const action = confirmAction;
+    if (!action) return;
+
+    setConfirmAction(null);
+    await action.onConfirm();
   }
 
   async function downloadPpt() {
@@ -323,6 +409,53 @@ export default function ReviewDraftAI() {
 
   return (
     <div className="max-w-6xl mx-auto px-container-padding py-stack-md">
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 px-4">
+          <div className="w-full max-w-md rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div
+                className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
+                  confirmAction.tone === 'danger' ? 'bg-error-container' : 'bg-primary-fixed'
+                }`}
+              >
+                <span
+                  className={`material-symbols-outlined ${
+                    confirmAction.tone === 'danger' ? 'text-error' : 'text-primary'
+                  }`}
+                >
+                  {confirmAction.tone === 'danger' ? 'warning' : 'autorenew'}
+                </span>
+              </div>
+              <div>
+                <h3 className="text-headline-md text-on-surface font-bold">{confirmAction.title}</h3>
+                <p className="text-body-md text-on-surface-variant mt-2">{confirmAction.message}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="h-10 px-4 rounded-lg border border-outline-variant text-label-md text-on-surface-variant hover:bg-surface-container"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAction}
+                className={`h-10 px-5 rounded-lg text-label-md ${
+                  confirmAction.tone === 'danger'
+                    ? 'bg-error text-on-error'
+                    : 'bg-primary text-on-primary'
+                }`}
+              >
+                {confirmAction.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap justify-between items-start gap-3 bg-secondary-container/20 border border-secondary-container/40 rounded-xl p-4 mb-6">
         <div className="flex items-start gap-2">
           <span className="material-symbols-outlined text-secondary">auto_awesome</span>
@@ -339,6 +472,15 @@ export default function ReviewDraftAI() {
       </div>
 
       {error && <p className="error-text mb-4">{error}</p>}
+      {aiProgress && (
+        <div className="mb-4">
+          <AiProgressBar
+            title={aiProgress.title}
+            description={aiProgress.description}
+            progress={aiProgress.progress}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-6">

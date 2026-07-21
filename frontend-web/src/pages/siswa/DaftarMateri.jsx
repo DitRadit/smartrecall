@@ -24,7 +24,10 @@ const CARD_STYLES = [
 
 export default function DaftarMateri() {
   const { user } = useAuth();
+  const [groupList, setGroupList] = useState([]);
   const [materiList, setMateriList] = useState([]);
+  const [currentParentId, setCurrentParentId] = useState(null);
+  const [breadcrumb, setBreadcrumb] = useState([]);
   const [isOffline, setIsOffline] = useState(false);
   // offlineStatus[materiId] = { rangkuman, flashcard, soal } (Boolean tiap jenis)
   const [offlineStatus, setOfflineStatus] = useState({});
@@ -35,18 +38,27 @@ export default function DaftarMateri() {
     loadMateri();
   }, []);
 
-  async function loadMateri() {
+  async function loadMateri(parentId = null) {
     try {
-      const response = await api.get('/materi');
-      setMateriList(response.data.materi);
+      const query = parentId ? `?parentId=${parentId}` : '';
+      const response = await api.get(`/groups${query}`);
+      const visibleMateri = response.data.materi || [];
+      setGroupList(response.data.groups || []);
+      setMateriList(visibleMateri);
+      setCurrentParentId(parentId);
       setIsOffline(false);
-      await cacheMateriList(response.data.materi); // refresh cache, source of truth tetap backend-api
-      await refreshOfflineStatus(response.data.materi);
+
+      const allMateriResponse = await api.get('/materi');
+      await cacheMateriList(allMateriResponse.data.materi || []); // refresh cache, source of truth tetap backend-api
+      await refreshOfflineStatus(visibleMateri);
     } catch (err) {
       // Gagal terhubung ke backend-api -> tampilkan data dari cache (bukan source of truth,
       // hanya untuk memastikan siswa tetap bisa lanjut belajar, ARCHITECTURE.md prinsip #2).
       const cached = await getCachedMateriList();
+      setGroupList([]);
       setMateriList(cached);
+      setCurrentParentId(null);
+      setBreadcrumb([]);
       setIsOffline(true);
       await refreshOfflineStatus(cached);
     }
@@ -73,6 +85,35 @@ export default function DaftarMateri() {
     }
   }
 
+  function handleNavigateFolder(group) {
+    setBreadcrumb((prev) => [...prev, { id: group.id, nama: group.nama }]);
+    loadMateri(group.id);
+  }
+
+  function handleNavigateBreadcrumb(index) {
+    if (index === -1) {
+      setBreadcrumb([]);
+      loadMateri(null);
+      return;
+    }
+
+    const nextBreadcrumb = breadcrumb.slice(0, index + 1);
+    setBreadcrumb(nextBreadcrumb);
+    loadMateri(nextBreadcrumb[index].id);
+  }
+
+  function handleBack() {
+    if (breadcrumb.length <= 1) {
+      setBreadcrumb([]);
+      loadMateri(null);
+      return;
+    }
+
+    const nextBreadcrumb = breadcrumb.slice(0, -1);
+    setBreadcrumb(nextBreadcrumb);
+    loadMateri(nextBreadcrumb[nextBreadcrumb.length - 1].id);
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {isOffline && <OfflineBanner>Sedang offline — menampilkan data tersimpan</OfflineBanner>}
@@ -83,11 +124,72 @@ export default function DaftarMateri() {
           <p className="text-body-md text-on-surface-variant mt-1">Daftar pelajaran yang tersedia untuk dipelajari.</p>
         </div>
 
-        {materiList.length === 0 && (
+        {!isOffline && (
+          <div className="space-y-3">
+            {currentParentId && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-outline-variant text-label-md text-primary hover:bg-surface-container"
+              >
+                <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                Kembali
+              </button>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 text-label-md text-on-surface-variant">
+              <button
+                type="button"
+                onClick={() => handleNavigateBreadcrumb(-1)}
+                className={`inline-flex items-center gap-1 hover:text-primary ${currentParentId ? '' : 'text-primary font-semibold'}`}
+              >
+                <span className="material-symbols-outlined text-[18px]">home</span>
+                Beranda
+              </button>
+              {breadcrumb.map((item, index) => (
+                <span key={item.id} className="inline-flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateBreadcrumb(index)}
+                    className={`hover:text-primary ${index === breadcrumb.length - 1 ? 'text-primary font-semibold' : ''}`}
+                  >
+                    {item.nama}
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {groupList.length === 0 && materiList.length === 0 && (
           <p className="text-body-md text-on-surface-variant">Belum ada materi yang tersedia.</p>
         )}
 
         <div className="space-y-4">
+          {groupList.map((g) => (
+            <button
+              key={`group-${g.id}`}
+              type="button"
+              onClick={() => handleNavigateFolder(g)}
+              className="w-full text-left bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter hover:bg-surface-container-low transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-lg bg-secondary-container flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[32px] text-on-secondary-container">folder</span>
+                </div>
+                <div className="flex-grow min-w-0">
+                  <h3 className="text-headline-md text-primary truncate">{g.nama}</h3>
+                  <span className="mt-1 inline-flex items-center gap-1 text-label-sm text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[16px]">folder_open</span>
+                    Buka folder
+                  </span>
+                </div>
+                <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+              </div>
+            </button>
+          ))}
+
           {materiList.map((m, i) => {
             const style = CARD_STYLES[i % CARD_STYLES.length];
             return (

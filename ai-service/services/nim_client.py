@@ -264,9 +264,16 @@ def _build_variant_prompt(source_content: dict, jenis_konten: str) -> str:
             '{"pertanyaan": "...", "opsi_jawaban": ["...","...","...","..."], '
             '"alasan": "...", "jawaban_benar": "A"}. '
             "JANGAN pakai key lain seperti 'question', 'options', 'answer', atau 'correct_answer'. "
-            "Buat soal pilihan ganda baru dengan tepat 4 opsi. Opsi jawaban tidak boleh "
-            "sekadar disalin dari versi lama; pengecoh harus masuk akal, dan jawaban_benar "
-            "wajib salah satu dari A/B/C/D sesuai urutan opsi.\n\n"
+            "Buat soal pilihan ganda baru dengan tepat 4 opsi. WAJIB ganti inti pertanyaan, "
+            "bukan hanya mengganti atau menambah opsi jawaban. JANGAN mempertahankan pola "
+            "pertanyaan lama seperti 'Apa yang dimaksud...', 'Apa yang dapat...', atau "
+            "pertanyaan definisi yang sama lalu hanya mengubah opsi menjadi daftar istilah "
+            "seperti 'Tuberkulosis' atau 'Emfisema'. Pertanyaan baru harus menguji sudut "
+            "berbeda: contoh penerapan, sebab-akibat, urutan proses, membandingkan dua konsep, "
+            "atau kasus singkat. Opsi jawaban harus berupa pernyataan/deskripsi lengkap yang "
+            "relevan dengan pertanyaan, bukan fragmen/butir istilah polos dan tidak boleh "
+            "diawali titik, bullet, atau label A/B/C/D. Pengecoh harus masuk akal, dan "
+            "jawaban_benar wajib salah satu dari A/B/C/D sesuai urutan opsi.\n\n"
             f"Versi lama:\n{source_json}"
         )
     if jenis_konten == "rangkuman":

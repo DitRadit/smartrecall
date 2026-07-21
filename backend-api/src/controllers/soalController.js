@@ -11,6 +11,11 @@ const prisma = require('../config/db');
 const aiServiceClient = require('../services/aiServiceClient');
 
 const OPSI_LABELS = ['A', 'B', 'C', 'D'];
+const QUESTION_STOPWORDS = new Set([
+  'apa', 'yang', 'dapat', 'dengan', 'pada', 'di', 'ke', 'dari', 'dan', 'atau',
+  'adalah', 'itu', 'ini', 'untuk', 'dalam', 'secara', 'sebagai', 'berikut',
+  'dimaksud', 'menjadi', 'terjadi',
+]);
 
 function normalizeSoalCandidates(parsed) {
   if (Array.isArray(parsed)) return parsed;
@@ -28,10 +33,66 @@ function normalizeSoalItem(item) {
   const opsiJawaban = item?.opsi_jawaban || item?.opsiJawaban || item?.options || item?.pilihan || item?.choices || [];
   const jawabanBenar = item?.jawaban_benar || item?.jawabanBenar || item?.correct_answer || item?.answer || item?.kunci || '';
   return {
-    pertanyaan,
-    opsi_jawaban: Array.isArray(opsiJawaban) ? opsiJawaban : [],
+    pertanyaan: String(pertanyaan || '').trim(),
+    opsi_jawaban: Array.isArray(opsiJawaban) ? opsiJawaban.map((opsi) => String(opsi || '').trim()) : [],
     jawaban_benar: String(jawabanBenar).trim().toUpperCase().slice(0, 1),
   };
+}
+
+function hasMalformedOption(opsiJawaban) {
+  return opsiJawaban.some((opsi) => /^[.\-•]\s*/.test(opsi) || /^[A-D][.)]\s*/i.test(opsi));
+}
+
+function makeQuestionKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[?!.]+$/g, '')
+    .trim();
+}
+
+function questionTokens(value) {
+  return makeQuestionKey(value)
+    .split(' ')
+    .map((token) => token.trim())
+    .filter((token) => token.length > 2 && !QUESTION_STOPWORDS.has(token));
+}
+
+function questionSimilarity(a, b) {
+  const aTokens = new Set(questionTokens(a));
+  const bTokens = new Set(questionTokens(b));
+  if (aTokens.size === 0 || bTokens.size === 0) return 0;
+
+  let intersection = 0;
+  for (const token of aTokens) {
+    if (bTokens.has(token)) intersection += 1;
+  }
+  const union = new Set([...aTokens, ...bTokens]).size;
+  return intersection / union;
+}
+
+function isNearDuplicateQuestion(a, b) {
+  const aKey = makeQuestionKey(a);
+  const bKey = makeQuestionKey(b);
+  if (!aKey || !bKey) return false;
+  if (aKey === bKey) return true;
+  return questionSimilarity(a, b) >= 0.72;
+}
+
+function dedupeSoalByQuestion(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = makeQuestionKey(item.pertanyaan);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function filterNewQuestionsOnly(candidates, existingQuestions) {
+  return candidates.filter((candidate) => (
+    !existingQuestions.some((question) => isNearDuplicateQuestion(candidate.pertanyaan, question))
+  ));
 }
 
 /**
@@ -267,20 +328,28 @@ async function regenerateSoalByMateri(req, res) {
     const parsed = result?.draft?.parsed;
     const candidates = normalizeSoalCandidates(parsed);
     const normalizedCandidates = candidates.map(normalizeSoalItem);
-    const validCandidates = normalizedCandidates.filter(
-      (item) =>
-        item?.pertanyaan &&
-        Array.isArray(item.opsi_jawaban) &&
-        item.opsi_jawaban.length === 4 &&
-        ['A', 'B', 'C', 'D'].includes(item.jawaban_benar),
-    );
+    const existingQuestions = materi.bankSoal.map((soal) => soal.pertanyaan);
+    const validCandidates = filterNewQuestionsOnly(dedupeSoalByQuestion(
+      normalizedCandidates.filter(
+        (item) =>
+          item?.pertanyaan &&
+          Array.isArray(item.opsi_jawaban) &&
+          item.opsi_jawaban.length === 4 &&
+          item.opsi_jawaban.every((opsi) => opsi.trim()) &&
+          !hasMalformedOption(item.opsi_jawaban) &&
+          ['A', 'B', 'C', 'D'].includes(item.jawaban_benar),
+      ),
+    ), existingQuestions);
     if (validCandidates.length === 0) {
-      return res.status(502).json({ error: 'bad_ai_response', message: 'AI gagal menghasilkan bank soal pengganti yang valid' });
+      return res.status(502).json({
+        error: 'bad_ai_response',
+        message: 'AI belum menghasilkan soal yang benar-benar berbeda dari soal lama. Coba generate ulang lagi atau edit manual.',
+      });
     }
 
     await prisma.$transaction(
-      materi.bankSoal.map((soal, index) => {
-        const candidate = validCandidates[index % validCandidates.length];
+      materi.bankSoal.slice(0, validCandidates.length).map((soal, index) => {
+        const candidate = validCandidates[index];
         return prisma.bankSoal.update({
           where: { id: soal.id },
           data: {
