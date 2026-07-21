@@ -37,6 +37,7 @@ model User {
 
   // Relasi: guru yang membuat materi
   materiDiunggah Materi[] @relation("GuruMateri")
+  groups         Group[]  @relation("GuruGroups")
 
   // Relasi: progres & log review milik siswa
   reviewProgress ReviewProgress[]
@@ -51,6 +52,8 @@ model Materi {
   id           Int          @id @default(autoincrement())
   guruId       Int          @map("guru_id")
   guru         User         @relation("GuruMateri", fields: [guruId], references: [id])
+  groupId      Int?         @map("group_id")
+  group        Group?       @relation("GroupMateri", fields: [groupId], references: [id], onDelete: Cascade)
   judul        String
   fileOriginal String       @map("file_original")
   pptFile      String?      @map("ppt_file")
@@ -164,4 +167,18 @@ model QuizAttempt {
   submittedAt  DateTime @default(now()) @map("submitted_at")
 
   @@map("quiz_attempts")
+}
+
+model Group {
+  id        Int      @id @default(autoincrement())
+  guruId    Int      @map("guru_id")
+  guru      User     @relation("GuruGroups", fields: [guruId], references: [id])
+  nama      String
+  parentId  Int?     @map("parent_id")
+  parent    Group?   @relation("GroupToGroup", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Group[]  @relation("GroupToGroup")
+  materi    Materi[] @relation("GroupMateri")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("groups")
 }

@@ -50,7 +50,7 @@ async function saveGeneratedPpt(materiId, judul, ppt) {
  */
 async function uploadMateri(req, res) {
   try {
-    const { judul } = req.body;
+    const { judul, groupId } = req.body;
     const generatePpt = ['true', '1', 'yes'].includes(String(req.body.generate_ppt || '').toLowerCase());
     const file = req.file; // dari multer memory storage
 
@@ -65,6 +65,7 @@ async function uploadMateri(req, res) {
       data: {
         guruId: req.user.id,
         judul,
+        groupId: groupId ? parseInt(groupId, 10) : null,
         fileOriginal: file.originalname,
         status: 'draft',
       },

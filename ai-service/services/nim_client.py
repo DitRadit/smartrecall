@@ -352,6 +352,10 @@ def _generate_content_nvidia(config: dict, prompt: str, jenis_konten: str) -> di
             usage = data.get("usage") or None
             content_str = data["choices"][0]["message"]["content"]
             result = _parse_llm_json(content_str, jenis_konten)
+            if result.get("parsed") is None:
+                logger.warning("NVIDIA NIM API mengembalikan format JSON yang tidak valid (percobaan %s)", attempt)
+                last_error = NIMAPIError("Format JSON tidak valid atau gagal di-parse.")
+                continue
             result["token_usage"] = usage
             return result
 
@@ -423,6 +427,10 @@ def _generate_content_gemini(config: dict, prompt: str, jenis_konten: str) -> di
             if not content_str:
                 raise KeyError("candidates[0].content.parts[].text")
             result = _parse_llm_json(content_str, jenis_konten)
+            if result.get("parsed") is None:
+                logger.warning("Gemini API mengembalikan format JSON yang tidak valid (percobaan %s)", attempt)
+                last_error = NIMAPIError("Format JSON tidak valid atau gagal di-parse.")
+                continue
             result["token_usage"] = usage  # dipakai caller (routes/generate.py) untuk logging
             return result
 
@@ -493,7 +501,12 @@ def _escape_raw_control_chars_in_json_strings(text: str) -> str:
     for ch in text:
         if in_string:
             if escaped:
-                result.append(ch)
+                if ch in '"\\/bfnrtu':
+                    result.append(ch)
+                else:
+                    # Invalid escape sequence in JSON (e.g., \sum), escape the backslash itself
+                    result.append("\\")
+                    result.append(ch)
                 escaped = False
             elif ch == "\\":
                 result.append(ch)
