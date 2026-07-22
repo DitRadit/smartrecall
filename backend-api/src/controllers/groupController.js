@@ -143,46 +143,56 @@ async function getGroupContents(req, res) {
 }
 
 async function getStudentGroupContents(req, res, parentId) {
-  // Kumpulkan ID folder yang termasuk tree sesi aktif (folder aktif tiap
-  // guru yang punya sesi + semua descendant-nya). Ini murni untuk
-  // visibility LIVE di navigasi folder -- lihat materiAccessService.js
-  // untuk pemisahan dari akses permanen.
+  // 1. Kumpulkan ID folder yang termasuk tree sesi aktif (live)
   const allowedGroupIds = await getActiveSessionGroupIds();
+  
+  // 2. Kumpulkan materi ID yang punya akses permanen (MateriAccess)
+  const { getAccessibleMateriIds } = require('../services/materiAccessService');
+  const accessibleMateriIds = await getAccessibleMateriIds(req.user.id);
 
-  if (allowedGroupIds.size === 0) {
-    // Belum ada guru yang memulai sesi — tidak ada folder/materi yang
-    // ditampilkan lewat navigasi live. (Materi yang sudah pernah diakses
-    // siswa tetap terlihat lewat GET /materi, lihat materiController.listMateri.)
-    return res.status(200).json({ currentGroup: null, groups: [], materi: [] });
-  }
-
-  // Validasi: jika siswa minta folder tertentu (parentId), pastikan folder itu
-  // termasuk dalam tree folder aktif.
-  if (parentId !== null && !allowedGroupIds.has(parentId)) {
-    return res.status(404).json({ error: 'not_found', message: 'Folder tidak ditemukan' });
-  }
-
+  // 3. Ambil semua group
   const allGroups = await prisma.group.findMany({
     select: { id: true, nama: true, parentId: true, createdAt: true },
     orderBy: { createdAt: 'desc' },
   });
 
-  // Materi yang published DAN berada di dalam tree folder aktif saja.
+  // 4. Ambil materi yang published DAN (berada di tree sesi aktif ATAU diakses permanen)
   const publishedMateri = await prisma.materi.findMany({
     where: {
       status: 'published',
-      groupId: { in: [...allowedGroupIds] },
+      OR: [
+        { groupId: { in: [...allowedGroupIds] } },
+        { id: { in: accessibleMateriIds } },
+      ],
     },
     orderBy: { createdAt: 'desc' },
     select: selectMateriSummary(),
   });
 
-  // Materi ini baru saja legit ditampilkan ke siswa lewat sesi aktif --
+  // Materi ini baru saja legit ditampilkan ke siswa (terutama yang dari sesi aktif) --
   // catat sebagai akses permanen supaya tidak hilang setelah sesi berakhir
-  // (best-effort, tidak boleh menggagalkan response ke siswa).
+  const { grantMateriAccess } = require('../services/materiAccessService');
   grantMateriAccess(req.user.id, publishedMateri.map((m) => m.id)).catch((err) => {
     console.warn('grantMateriAccess gagal (non-fatal):', err.message);
   });
+
+  // 5. Kumpulkan semua groupId yang valid: 
+  // Gabungan dari folder aktif (allowedGroupIds) + folder nenek moyang dari materi yang bisa diakses
+  const allAccessibleGroupIds = collectAccessibleGroupIds(allGroups, publishedMateri);
+  for (const id of allowedGroupIds) {
+    allAccessibleGroupIds.add(id);
+  }
+
+  // Jika tidak ada folder yang bisa diakses dan tidak ada materi di root, kembalikan kosong
+  if (allAccessibleGroupIds.size === 0 && publishedMateri.filter(m => m.groupId === null).length === 0) {
+    return res.status(200).json({ currentGroup: null, groups: [], materi: [] });
+  }
+
+  // Validasi: jika siswa minta folder tertentu (parentId), pastikan folder itu
+  // termasuk dalam tree yang diizinkan.
+  if (parentId !== null && !allAccessibleGroupIds.has(parentId)) {
+    return res.status(404).json({ error: 'not_found', message: 'Folder tidak ditemukan' });
+  }
 
   let currentGroup = null;
   if (parentId) {
@@ -195,13 +205,16 @@ async function getStudentGroupContents(req, res, parentId) {
   // Sub-folder yang parentId-nya sesuai dengan folder yang sedang dibuka,
   // dan masih dalam tree yang diizinkan.
   const groups = allGroups.filter(
-    (g) => g.parentId === parentId && allowedGroupIds.has(g.id),
+    (g) => g.parentId === parentId && allAccessibleGroupIds.has(g.id)
   );
 
   // Materi langsung di folder ini (groupId === parentId dari request)
   const materi = publishedMateri.filter((item) => item.groupId === parentId);
+  
+  // Kirimkan juga semua folder yang bisa diakses agar frontend bisa menyimpannya ke IndexedDB (cache offline)
+  const allAccessibleGroups = allGroups.filter((g) => allAccessibleGroupIds.has(g.id));
 
-  return res.status(200).json({ currentGroup, groups, materi });
+  return res.status(200).json({ currentGroup, groups, materi, allAccessibleGroups });
 }
 
 

@@ -13,6 +13,7 @@ const DB_NAME = 'smartrecall-offline';
 const DB_VERSION = 2; // v2: tambah store soal, rangkuman, quiz_queue
 
 const STORE_MATERI = 'materi';
+const STORE_GROUPS = 'groups'; // cache folder
 const STORE_FLASHCARDS = 'flashcards';
 const STORE_REVIEW_SCHEDULE = 'review_schedule';
 const STORE_REVIEW_QUEUE = 'review_queue'; // offline queue untuk submit skor (lih. syncManager.js)
@@ -21,10 +22,13 @@ const STORE_RANGKUMAN = 'rangkuman'; // cache rangkuman per materi
 const STORE_QUIZ_QUEUE = 'quiz_queue'; // offline queue untuk submit hasil kuis
 
 async function getDb() {
-  return openDB(DB_NAME, DB_VERSION, {
+  return openDB(DB_NAME, DB_VERSION + 1, {
     upgrade(db, oldVersion) {
       if (!db.objectStoreNames.contains(STORE_MATERI)) {
         db.createObjectStore(STORE_MATERI, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_GROUPS)) {
+        db.createObjectStore(STORE_GROUPS, { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains(STORE_FLASHCARDS)) {
         db.createObjectStore(STORE_FLASHCARDS, { keyPath: 'id' });
@@ -59,6 +63,19 @@ export async function cacheMateriList(materiList) {
 export async function getCachedMateriList() {
   const db = await getDb();
   return db.getAll(STORE_MATERI);
+}
+
+// --- Group (Folder) cache ---
+export async function cacheGroupList(groupList) {
+  const db = await getDb();
+  const tx = db.transaction(STORE_GROUPS, 'readwrite');
+  await Promise.all(groupList.map((g) => tx.store.put(g)));
+  await tx.done;
+}
+
+export async function getCachedGroupList() {
+  const db = await getDb();
+  return db.getAll(STORE_GROUPS);
 }
 
 // --- Flashcards cache ---
@@ -148,6 +165,7 @@ export async function removeQueuedQuizSubmit(localId) {
 
 export const STORES = {
   STORE_MATERI,
+  STORE_GROUPS,
   STORE_FLASHCARDS,
   STORE_REVIEW_SCHEDULE,
   STORE_REVIEW_QUEUE,

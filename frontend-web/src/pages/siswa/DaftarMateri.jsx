@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../services/authContext';
-import { cacheMateriList, getCachedMateriList } from '../../offline/indexedDbCache';
+import { cacheMateriList, getCachedMateriList, cacheGroupList, getCachedGroupList } from '../../offline/indexedDbCache';
 import { downloadMateriForOffline, getMateriOfflineStatus } from '../../offline/prefetchMateri';
 import OfflineBanner from '../../components/OfflineBanner';
 
@@ -44,38 +44,41 @@ export default function DaftarMateri() {
     try {
       const query = parentId ? `?parentId=${parentId}` : '';
       const response = await api.get(`/groups${query}`);
-      const sessionMateri = response.data.materi || [];
-      setGroupList(response.data.groups || []);
+      const currentMateri = response.data.materi || [];
+      const currentGroups = response.data.groups || [];
+      
+      setGroupList(currentGroups);
+      setMateriList(currentMateri);
       setCurrentParentId(parentId);
       setIsOffline(false);
 
-      // /materi (untuk siswa) sekarang mengembalikan materi published yang
-      // ADA di sesi aktif ATAU yang sudah pernah diberikan akses permanen ke
-      // siswa ini (lihat materiController.listMateri). Di root view, gabungkan
-      // dengan hasil /groups supaya materi yang sudah pernah diakses/didownload
-      // tetap terlihat & bisa diklik walau sesi kelasnya sudah berakhir.
+      if (response.data.allAccessibleGroups) {
+          await cacheGroupList(response.data.allAccessibleGroups);
+      }
+
+      // /materi mengembalikan materi published yang ada di sesi aktif ATAU diakses permanen.
+      // Cache semua materi ini untuk penggunaan offline.
       const allMateriResponse = await api.get('/materi');
       const accessibleMateri = allMateriResponse.data.materi || [];
-      await cacheMateriList(accessibleMateri); // refresh cache, source of truth tetap backend-api
+      await cacheMateriList(accessibleMateri); 
 
-      let visibleMateri = sessionMateri;
-      if (!parentId) {
-        const seenIds = new Set(sessionMateri.map((m) => m.id));
-        const persistedMateri = accessibleMateri.filter((m) => !seenIds.has(m.id));
-        visibleMateri = [...sessionMateri, ...persistedMateri];
-      }
-      setMateriList(visibleMateri);
-      await refreshOfflineStatus(visibleMateri);
+      await refreshOfflineStatus(currentMateri);
     } catch (err) {
-      // Gagal terhubung ke backend-api -> tampilkan data dari cache (bukan source of truth,
-      // hanya untuk memastikan siswa tetap bisa lanjut belajar, ARCHITECTURE.md prinsip #2).
-      const cached = await getCachedMateriList();
-      setGroupList([]);
-      setMateriList(cached);
-      setCurrentParentId(null);
-      setBreadcrumb([]);
+      // Offline mode
+      const cachedGroups = await getCachedGroupList();
+      const cachedMateri = await getCachedMateriList();
+      
+      // Selalu tampilkan folder dan materi yang ada di cache agar struktur navigasi
+      // tidak berubah sama sekali saat offline. Materi yang belum didownload akan
+      // tetap terlihat dengan status "Belum diunduh".
+      const offlineGroups = cachedGroups.filter(g => g.parentId === parentId);
+      const offlineMateri = cachedMateri.filter(m => m.groupId === parentId);
+
+      setGroupList(offlineGroups);
+      setMateriList(offlineMateri);
+      setCurrentParentId(parentId);
       setIsOffline(true);
-      await refreshOfflineStatus(cached);
+      await refreshOfflineStatus(offlineMateri);
     }
   }
 
@@ -159,43 +162,41 @@ export default function DaftarMateri() {
           <p className="text-body-md text-on-surface-variant mt-1">Daftar pelajaran yang tersedia untuk dipelajari.</p>
         </div>
 
-        {!isOffline && (
-          <div className="space-y-3">
-            {currentParentId && (
-              <button
-                type="button"
-                onClick={handleBack}
-                className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-outline-variant text-label-md text-primary hover:bg-surface-container"
-              >
-                <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-                Kembali
-              </button>
-            )}
+        <div className="space-y-3">
+          {currentParentId && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-outline-variant text-label-md text-primary hover:bg-surface-container"
+            >
+              <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+              Kembali
+            </button>
+          )}
 
-            <div className="flex flex-wrap items-center gap-2 text-label-md text-on-surface-variant">
-              <button
-                type="button"
-                onClick={() => handleNavigateBreadcrumb(-1)}
-                className={`inline-flex items-center gap-1 hover:text-primary ${currentParentId ? '' : 'text-primary font-semibold'}`}
-              >
-                <span className="material-symbols-outlined text-[18px]">home</span>
-                Beranda
-              </button>
-              {breadcrumb.map((item, index) => (
-                <span key={item.id} className="inline-flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                  <button
-                    type="button"
-                    onClick={() => handleNavigateBreadcrumb(index)}
-                    className={`hover:text-primary ${index === breadcrumb.length - 1 ? 'text-primary font-semibold' : ''}`}
-                  >
-                    {item.nama}
-                  </button>
-                </span>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center gap-2 text-label-md text-on-surface-variant">
+            <button
+              type="button"
+              onClick={() => handleNavigateBreadcrumb(-1)}
+              className={`inline-flex items-center gap-1 hover:text-primary ${currentParentId ? '' : 'text-primary font-semibold'}`}
+            >
+              <span className="material-symbols-outlined text-[18px]">home</span>
+              Beranda
+            </button>
+            {breadcrumb.map((item, index) => (
+              <span key={item.id} className="inline-flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                <button
+                  type="button"
+                  onClick={() => handleNavigateBreadcrumb(index)}
+                  className={`hover:text-primary ${index === breadcrumb.length - 1 ? 'text-primary font-semibold' : ''}`}
+                >
+                  {item.nama}
+                </button>
+              </span>
+            ))}
           </div>
-        )}
+        </div>
 
         {groupList.length === 0 && materiList.length === 0 && (
           <p className="text-body-md text-on-surface-variant">Belum ada materi yang tersedia.</p>

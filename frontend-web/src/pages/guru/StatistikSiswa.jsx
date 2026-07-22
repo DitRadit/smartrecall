@@ -108,7 +108,7 @@ export default function StatistikSiswa() {
             <div className="flex items-end justify-between h-48 gap-2">
               {[0, 1, 2, 3, 4, 5].map(score => {
                 const count = histogram[score] || 0;
-                const heightPercentage = (count / totalReviews) * 100;
+                const heightPercentage = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
                 
                 // Warnai histogram: merah (0-2), kuning (3), hijau (4-5)
                 let barColor = 'bg-primary';
@@ -116,9 +116,9 @@ export default function StatistikSiswa() {
                 else if (score === 3) barColor = 'bg-secondary';
 
                 return (
-                  <div key={score} className="flex flex-col items-center gap-2 flex-1 group">
+                  <div key={score} className="flex flex-col items-center justify-end gap-2 flex-1 group h-full">
                     <span className="text-label-sm text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">{count}</span>
-                    <div className="w-full bg-surface-container rounded-t-md relative flex items-end justify-center h-full">
+                    <div className="w-full flex-1 rounded-t-md relative flex items-end justify-center">
                       <div 
                         className={`w-full rounded-t-md transition-all duration-500 ${barColor}`} 
                         style={{ height: `${heightPercentage}%`, minHeight: count > 0 ? '4px' : '0' }}
