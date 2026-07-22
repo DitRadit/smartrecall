@@ -46,6 +46,7 @@ model User {
   reviewLogs     ReviewLog[]
   rangkumanDibaca RangkumanRead[]
   quizAttempts   QuizAttempt[]
+  materiAccess   MateriAccess[]
 
   @@map("users")
 }
@@ -66,6 +67,7 @@ model Materi {
   bankSoal   BankSoal[]
   rangkuman  Rangkuman?
   quizAttempts QuizAttempt[]
+  accessGrants MateriAccess[]
 
   @@map("materi")
 }
@@ -169,6 +171,25 @@ model QuizAttempt {
   submittedAt  DateTime @default(now()) @map("submitted_at")
 
   @@map("quiz_attempts")
+}
+
+// Catatan akses permanen: materi apa saja yang PERNAH legit ditampilkan ke
+// siswa tertentu lewat sesi aktif (activeGroupId). Dipisahkan dari konsep
+// "sesi aktif saat ini" (live/transient, lihat User.activeGroupId & Group)
+// supaya materi yang sudah diunduh siswa untuk offline tidak hilang begitu
+// guru menekan "Akhiri Sesi", DAN supaya endpoint konten (flashcard/
+// rangkuman/soal) bisa memverifikasi otorisasi per-siswa, bukan cuma
+// menyaring apa yang tampil di daftar folder.
+model MateriAccess {
+  id         Int      @id @default(autoincrement())
+  siswaId    Int      @map("siswa_id")
+  siswa      User     @relation(fields: [siswaId], references: [id])
+  materiId   Int      @map("materi_id")
+  materi     Materi   @relation(fields: [materiId], references: [id], onDelete: Cascade)
+  grantedAt  DateTime @default(now()) @map("granted_at")
+
+  @@unique([siswaId, materiId])
+  @@map("materi_access")
 }
 
 model Group {

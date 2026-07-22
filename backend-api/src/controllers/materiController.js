@@ -10,6 +10,7 @@
 
 const prisma = require('../config/db');
 const aiServiceClient = require('../services/aiServiceClient');
+const { getActiveSessionGroupIds, getAccessibleMateriIds } = require('../services/materiAccessService');
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -372,13 +373,31 @@ async function getGenerateProgress(req, res) {
 
 /**
  * GET /materi
- * Siswa hanya melihat materi published. Guru bisa melihat semua materi miliknya.
+ * Guru bisa melihat semua materi miliknya.
+ * Siswa hanya melihat materi published DAN (berada di tree sesi aktif
+ * saat ini ATAU sudah pernah diberikan akses permanen lewat MateriAccess).
+ * Klausa kedua ini yang menjamin materi yang sudah didownload offline
+ * tetap muncul di sini walau sesi kelasnya sudah diakhiri guru -- lihat
+ * materiAccessService.js untuk detail pemisahan live vs permanen.
  */
 async function listMateri(req, res) {
   try {
-    const where = req.user.role === 'siswa'
-      ? { status: 'published' }
-      : { guruId: req.user.id };
+    let where;
+    if (req.user.role === 'siswa') {
+      const [activeGroupIds, accessibleMateriIds] = await Promise.all([
+        getActiveSessionGroupIds(),
+        getAccessibleMateriIds(req.user.id),
+      ]);
+      where = {
+        status: 'published',
+        OR: [
+          { groupId: { in: [...activeGroupIds] } },
+          { id: { in: accessibleMateriIds } },
+        ],
+      };
+    } else {
+      where = { guruId: req.user.id };
+    }
 
     const materiList = await prisma.materi.findMany({
       where,

@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { getActiveSessionGroupIds, grantMateriAccess } = require('../services/materiAccessService');
 
 function parseOptionalId(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -142,50 +143,29 @@ async function getGroupContents(req, res) {
 }
 
 async function getStudentGroupContents(req, res, parentId) {
-  // Cari guru yang memiliki sesi aktif (activeGroupId != null).
-  // Dalam setup satu-laptop-satu-guru ini biasanya hanya ada satu sesi aktif.
-  // Jika ada lebih dari satu guru yang aktif, ambil semua (union materi mereka).
-  const activeGurus = await prisma.user.findMany({
-    where: { role: 'guru', activeGroupId: { not: null } },
-    select: { activeGroupId: true },
-  });
+  // Kumpulkan ID folder yang termasuk tree sesi aktif (folder aktif tiap
+  // guru yang punya sesi + semua descendant-nya). Ini murni untuk
+  // visibility LIVE di navigasi folder -- lihat materiAccessService.js
+  // untuk pemisahan dari akses permanen.
+  const allowedGroupIds = await getActiveSessionGroupIds();
 
-  if (activeGurus.length === 0) {
-    // Belum ada guru yang memulai sesi — tidak ada materi yang ditampilkan.
+  if (allowedGroupIds.size === 0) {
+    // Belum ada guru yang memulai sesi — tidak ada folder/materi yang
+    // ditampilkan lewat navigasi live. (Materi yang sudah pernah diakses
+    // siswa tetap terlihat lewat GET /materi, lihat materiController.listMateri.)
     return res.status(200).json({ currentGroup: null, groups: [], materi: [] });
   }
-
-  const activeGroupIds = activeGurus.map((g) => g.activeGroupId);
-
-  // Kumpulkan semua ID folder yang merupakan turunan dari folder aktif,
-  // termasuk folder aktif itu sendiri, agar navigasi subfolder tetap bisa.
-  const allGroups = await prisma.group.findMany({
-    select: { id: true, nama: true, parentId: true, createdAt: true },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  function collectDescendantIds(rootIds) {
-    const result = new Set(rootIds);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const g of allGroups) {
-        if (!result.has(g.id) && g.parentId !== null && result.has(g.parentId)) {
-          result.add(g.id);
-          changed = true;
-        }
-      }
-    }
-    return result;
-  }
-
-  const allowedGroupIds = collectDescendantIds(activeGroupIds);
 
   // Validasi: jika siswa minta folder tertentu (parentId), pastikan folder itu
   // termasuk dalam tree folder aktif.
   if (parentId !== null && !allowedGroupIds.has(parentId)) {
     return res.status(404).json({ error: 'not_found', message: 'Folder tidak ditemukan' });
   }
+
+  const allGroups = await prisma.group.findMany({
+    select: { id: true, nama: true, parentId: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
 
   // Materi yang published DAN berada di dalam tree folder aktif saja.
   const publishedMateri = await prisma.materi.findMany({
@@ -195,6 +175,13 @@ async function getStudentGroupContents(req, res, parentId) {
     },
     orderBy: { createdAt: 'desc' },
     select: selectMateriSummary(),
+  });
+
+  // Materi ini baru saja legit ditampilkan ke siswa lewat sesi aktif --
+  // catat sebagai akses permanen supaya tidak hilang setelah sesi berakhir
+  // (best-effort, tidak boleh menggagalkan response ke siswa).
+  grantMateriAccess(req.user.id, publishedMateri.map((m) => m.id)).catch((err) => {
+    console.warn('grantMateriAccess gagal (non-fatal):', err.message);
   });
 
   let currentGroup = null;

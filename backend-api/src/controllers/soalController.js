@@ -8,6 +8,7 @@
  */
 
 const prisma = require('../config/db');
+const { canStudentAccessMateri } = require('../services/materiAccessService');
 const aiServiceClient = require('../services/aiServiceClient');
 
 const OPSI_LABELS = ['A', 'B', 'C', 'D'];
@@ -114,6 +115,15 @@ async function getSoalByMateri(req, res) {
 
     if (!materi) {
       return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan atau belum dipublikasikan' });
+    }
+
+    // Untuk siswa: cek otorisasi sesi aktif / MateriAccess permanen, sama
+    // seperti flashcardController.getFlashcardsByMateri.
+    if (req.user.role === 'siswa') {
+      const allowed = await canStudentAccessMateri(req.user.id, materiId);
+      if (!allowed) {
+        return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan atau belum dipublikasikan' });
+      }
     }
 
     const soalUntukSiswa = materi.bankSoal.map((s) => ({

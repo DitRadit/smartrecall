@@ -7,6 +7,7 @@
 
 const prisma = require('../config/db');
 const aiServiceClient = require('../services/aiServiceClient');
+const { canStudentAccessMateri } = require('../services/materiAccessService');
 
 function normalizeFlashcardCandidates(parsed) {
   if (Array.isArray(parsed)) return parsed;
@@ -190,6 +191,17 @@ async function getFlashcardsByMateri(req, res) {
     });
     if (!materi) {
       return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
+    }
+
+    // Untuk siswa: materi published saja TIDAK cukup -- harus berada di
+    // tree sesi aktif ATAU sudah punya MateriAccess permanen. Ini menutup
+    // celah siswa kelas B menembak materiId kelas A lewat endpoint ini
+    // (lih. materiAccessService.js).
+    if (req.user.role === 'siswa') {
+      const allowed = await canStudentAccessMateri(req.user.id, materiId);
+      if (!allowed) {
+        return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
+      }
     }
 
     const flashcards = await prisma.flashcard.findMany({

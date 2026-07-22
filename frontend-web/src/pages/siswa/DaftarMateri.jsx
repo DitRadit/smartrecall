@@ -44,14 +44,27 @@ export default function DaftarMateri() {
     try {
       const query = parentId ? `?parentId=${parentId}` : '';
       const response = await api.get(`/groups${query}`);
-      const visibleMateri = response.data.materi || [];
+      const sessionMateri = response.data.materi || [];
       setGroupList(response.data.groups || []);
-      setMateriList(visibleMateri);
       setCurrentParentId(parentId);
       setIsOffline(false);
 
+      // /materi (untuk siswa) sekarang mengembalikan materi published yang
+      // ADA di sesi aktif ATAU yang sudah pernah diberikan akses permanen ke
+      // siswa ini (lihat materiController.listMateri). Di root view, gabungkan
+      // dengan hasil /groups supaya materi yang sudah pernah diakses/didownload
+      // tetap terlihat & bisa diklik walau sesi kelasnya sudah berakhir.
       const allMateriResponse = await api.get('/materi');
-      await cacheMateriList(allMateriResponse.data.materi || []); // refresh cache, source of truth tetap backend-api
+      const accessibleMateri = allMateriResponse.data.materi || [];
+      await cacheMateriList(accessibleMateri); // refresh cache, source of truth tetap backend-api
+
+      let visibleMateri = sessionMateri;
+      if (!parentId) {
+        const seenIds = new Set(sessionMateri.map((m) => m.id));
+        const persistedMateri = accessibleMateri.filter((m) => !seenIds.has(m.id));
+        visibleMateri = [...sessionMateri, ...persistedMateri];
+      }
+      setMateriList(visibleMateri);
       await refreshOfflineStatus(visibleMateri);
     } catch (err) {
       // Gagal terhubung ke backend-api -> tampilkan data dari cache (bukan source of truth,
