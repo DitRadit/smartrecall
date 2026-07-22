@@ -31,8 +31,10 @@ export default function DaftarMateri() {
   const [isOffline, setIsOffline] = useState(false);
   // offlineStatus[materiId] = { rangkuman, flashcard, soal } (Boolean tiap jenis)
   const [offlineStatus, setOfflineStatus] = useState({});
-  // downloadingId = materi yang sedang diunduh (disable tombol + tampilkan progres)
+  // downloadingId = materi yang sedang diunduh untuk offline (disable tombol + tampilkan progres)
   const [downloadingId, setDownloadingId] = useState(null);
+  // downloadingPptId = materi yang PPT-nya sedang diunduh
+  const [downloadingPptId, setDownloadingPptId] = useState(null);
 
   useEffect(() => {
     loadMateri();
@@ -82,6 +84,26 @@ export default function DaftarMateri() {
       const status = await getMateriOfflineStatus(materiId);
       setOfflineStatus((prev) => ({ ...prev, [materiId]: status }));
       setDownloadingId(null);
+    }
+  }
+
+  async function handleDownloadPpt(materi) {
+    if (downloadingPptId) return;
+    setDownloadingPptId(materi.id);
+    try {
+      const response = await api.get(`/materi/${materi.id}/ppt/siswa`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${materi.judul || 'materi'}.pptx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Gagal download PPT:', err);
+    } finally {
+      setDownloadingPptId(null);
     }
   }
 
@@ -285,6 +307,20 @@ export default function DaftarMateri() {
                     <span className="material-symbols-outlined text-[18px]">quiz</span>
                     Kuis
                   </Link>
+                  {m.pptFile && !isOffline && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadPpt(m)}
+                      disabled={downloadingPptId === m.id}
+                      title="Unduh file presentasi PPT"
+                      className="flex items-center gap-1 h-9 px-4 rounded-full border border-outline-variant text-label-sm text-on-surface-variant hover:bg-surface-container disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {downloadingPptId === m.id ? 'sync' : 'slideshow'}
+                      </span>
+                      {downloadingPptId === m.id ? 'Mengunduh...' : 'Unduh PPT'}
+                    </button>
+                  )}
                 </div>
               </div>
             );

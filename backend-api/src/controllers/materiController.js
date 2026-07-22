@@ -450,6 +450,35 @@ async function downloadMateriPpt(req, res) {
 }
 
 /**
+ * GET /materi/:id/ppt/siswa
+ * Siswa download PPT dari materi yang sudah published.
+ * Hanya bisa akses materi dengan status 'published' — tidak bisa akses draft.
+ */
+async function downloadMateriPptSiswa(req, res) {
+  try {
+    const materiId = parseInt(req.params.id, 10);
+    const materi = await prisma.materi.findFirst({
+      where: { id: materiId, status: 'published' },
+      select: { id: true, judul: true, pptFile: true },
+    });
+
+    if (!materi) {
+      return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
+    }
+    if (!materi.pptFile) {
+      return res.status(404).json({ error: 'not_found', message: 'PPT belum tersedia untuk materi ini' });
+    }
+
+    const fullPath = path.join(GENERATED_PPT_DIR, materi.pptFile);
+    const downloadName = `${sanitizeFilename(materi.judul)}.pptx`;
+    return res.download(fullPath, downloadName);
+  } catch (err) {
+    console.error('downloadMateriPptSiswa error:', err);
+    return res.status(500).json({ error: 'internal_error', message: 'Gagal download PPT' });
+  }
+}
+
+/**
  * POST /materi/:id/approve
  * Guru approve/edit/reject draft AI (human-in-the-loop, FR-6).
  * Body: { action: "approve" | "reject", flashcard_edits?: [{id, pertanyaan, jawaban}] }
@@ -586,5 +615,6 @@ module.exports = {
   deleteMateri,
   moveMateri,
   downloadMateriPpt,
+  downloadMateriPptSiswa,
   generateAIContentInBackground,
 };

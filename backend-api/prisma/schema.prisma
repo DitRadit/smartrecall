@@ -33,6 +33,7 @@ model User {
   passwordHash String   @map("password_hash")
   nis          String?  @unique // opsional, identifier administratif tambahan untuk siswa
   kelasId      String?  @map("kelas_id")
+  activeGroupId Int?     @map("active_group_id")
   createdAt    DateTime @default(now()) @map("created_at")
   lastSyncAt   DateTime? @map("last_sync_at")
 

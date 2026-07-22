@@ -6,6 +6,17 @@ PENTING (ARCHITECTURE.md bagian 7 & 8):
 - Ini adalah satu-satunya titik yang butuh koneksi internet aktif di seluruh sistem.
 - Retry sederhana disediakan di sini, tapi kontrol rate-limit/queue utama tetap
   berada di backend-api (batch generate), sesuai prinsip "satu tempat kontrol".
+
+TASK-SPLITTING & FALLBACK (baru):
+- Tiap jenis_konten bisa punya provider DEFAULT sendiri lewat env var
+  AI_PROVIDER_FLASHCARD / AI_PROVIDER_RANGKUMAN / AI_PROVIDER_SOAL.
+  Kalau env var itu tidak di-set, jatuh ke AI_PROVIDER (default lama).
+- Kalau provider default untuk suatu jenis_konten gagal total (semua retry
+  internalnya habis), otomatis dicoba provider satunya sebagai BACKUP --
+  hanya jika API key backup itu tersedia di env. Ini murni untuk mencegah
+  crash total saat demo/produksi, bukan untuk menghemat/memboroskan token:
+  setiap panggilan generate tetap hanya memanggil SATU model dalam kondisi
+  normal (task-splitting tidak menggandakan biaya token).
 """
 
 import os
@@ -52,15 +63,102 @@ class NIMAPIError(Exception):
     pass
 
 
-def _get_config():
-    provider = os.getenv("AI_PROVIDER", "gemini").strip().lower()
+# Mapping jenis_konten -> nama env var provider default-nya.
+# Kalau env var ini tidak di-set, jatuh ke AI_PROVIDER (perilaku lama).
+_PROVIDER_ENV_BY_JENIS_KONTEN = {
+    "flashcard": "AI_PROVIDER_FLASHCARD",
+    "rangkuman": "AI_PROVIDER_RANGKUMAN",
+    "soal": "AI_PROVIDER_SOAL",
+}
+
+# Mapping jenis_konten -> nama env var MODEL NVIDIA NIM spesifik jenis itu.
+# Dipakai untuk kasus mis. flashcard/rangkuman pakai Llama 8B (cepat/ringan),
+# soal pakai Llama 70B (lebih kuat menalar opsi jawaban & pengecoh).
+# Kalau env var ini tidak di-set, jatuh ke NIM_MODEL_NAME (perilaku lama).
+_NIM_MODEL_ENV_BY_JENIS_KONTEN = {
+    "flashcard": "NIM_MODEL_NAME_FLASHCARD",
+    "rangkuman": "NIM_MODEL_NAME_RANGKUMAN",
+    "soal": "NIM_MODEL_NAME_SOAL",
+}
+
+
+def _default_provider_for(jenis_konten: str) -> str:
+    """
+    Tentukan provider default untuk suatu jenis_konten. Urutan resolusi:
+      1. Env var spesifik jenis_konten (mis. AI_PROVIDER_SOAL)
+      2. AI_PROVIDER (fallback umum lama)
+      3. "gemini" (default terakhir kalau semua env var kosong)
+    """
+    specific_env_name = _PROVIDER_ENV_BY_JENIS_KONTEN.get(jenis_konten)
+    if specific_env_name:
+        specific_value = os.getenv(specific_env_name)
+        if specific_value:
+            return specific_value.strip().lower()
+
+    return os.getenv("AI_PROVIDER", "gemini").strip().lower()
+
+
+def _default_nim_model_for(jenis_konten: str) -> str:
+    """
+    Tentukan model NVIDIA NIM (mis. Llama 8B vs 70B) untuk suatu jenis_konten.
+    Urutan resolusi:
+      1. Env var spesifik jenis_konten (mis. NIM_MODEL_NAME_SOAL)
+      2. NIM_MODEL_NAME (fallback umum lama)
+      3. "meta/llama-3.1-8b-instruct" (default terakhir)
+    HANYA relevan kalau providernya "nvidia" -- Gemini punya mekanisme
+    model sendiri lewat GEMINI_MODEL_NAME.
+    """
+    specific_env_name = _NIM_MODEL_ENV_BY_JENIS_KONTEN.get(jenis_konten)
+    if specific_env_name:
+        specific_value = os.getenv(specific_env_name)
+        if specific_value:
+            return specific_value.strip()
+
+    return os.getenv("NIM_MODEL_NAME", "meta/llama-3.1-8b-instruct").strip()
+
+
+# Mapping jenis_konten -> nama env var MODEL GEMINI spesifik jenis itu.
+# Sama seperti _NIM_MODEL_ENV_BY_JENIS_KONTEN, tapi untuk Gemini (mis.
+# flashcard/rangkuman pakai gemini-flash-latest yang cepat/murah, soal
+# pakai gemini-pro-latest yang lebih kuat menalar).
+# Kalau env var ini tidak di-set, jatuh ke GEMINI_MODEL_NAME (perilaku lama).
+_GEMINI_MODEL_ENV_BY_JENIS_KONTEN = {
+    "flashcard": "GEMINI_MODEL_NAME_FLASHCARD",
+    "rangkuman": "GEMINI_MODEL_NAME_RANGKUMAN",
+    "soal": "GEMINI_MODEL_NAME_SOAL",
+}
+
+
+def _default_gemini_model_for(jenis_konten: str) -> str:
+    """
+    Tentukan model Gemini untuk suatu jenis_konten. Urutan resolusi:
+      1. Env var spesifik jenis_konten (mis. GEMINI_MODEL_NAME_SOAL)
+      2. GEMINI_MODEL_NAME (fallback umum lama)
+      3. "gemini-flash-latest" (default terakhir)
+    """
+    specific_env_name = _GEMINI_MODEL_ENV_BY_JENIS_KONTEN.get(jenis_konten)
+    if specific_env_name:
+        specific_value = os.getenv(specific_env_name)
+        if specific_value:
+            return specific_value.strip()
+
+    return os.getenv("GEMINI_MODEL_NAME", "gemini-flash-latest").strip()
+
+
+def _get_config(provider: str = None, jenis_konten: str = ""):
+    """
+    provider: kalau None (caller lama seperti ppt_generator.py yang belum
+    diupdate manggil tanpa argumen), jatuh ke AI_PROVIDER dari env -- sama
+    seperti perilaku _get_config() sebelum task-splitting ditambahkan.
+    """
+    provider = (provider or os.getenv("AI_PROVIDER", "gemini")).strip().lower()
     if provider not in {"gemini", "nvidia"}:
-        raise NIMAPIError("AI_PROVIDER harus 'gemini' atau 'nvidia'.")
+        raise NIMAPIError("Provider harus 'gemini' atau 'nvidia'.")
 
     if provider == "nvidia":
         api_key = os.getenv("NIM_API_KEY")
         base_url = os.getenv("NIM_API_BASE_URL", "https://integrate.api.nvidia.com/v1")
-        model = os.getenv("NIM_MODEL_NAME", "meta/llama-3.1-8b-instruct")
+        model = _default_nim_model_for(jenis_konten)
         timeout = int(os.getenv("NIM_REQUEST_TIMEOUT_SECONDS", "60"))
         max_retries = int(os.getenv("NIM_MAX_RETRIES", "4"))
         rate_limit_sleep = float(os.getenv("NIM_RATE_LIMIT_SLEEP_SECONDS", "30"))
@@ -68,7 +166,7 @@ def _get_config():
     else:
         api_key = os.getenv("GEMINI_API_KEY")
         base_url = os.getenv("GEMINI_API_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
-        model = os.getenv("GEMINI_MODEL_NAME", "gemini-flash-latest")
+        model = _default_gemini_model_for(jenis_konten)
         timeout = int(os.getenv("GEMINI_REQUEST_TIMEOUT_SECONDS", "60"))
         max_retries = int(os.getenv("GEMINI_MAX_RETRIES", "4"))
         rate_limit_sleep = float(os.getenv("GEMINI_RATE_LIMIT_SLEEP_SECONDS", "30"))
@@ -89,6 +187,12 @@ def _get_config():
         "max_retries": max_retries,
         "rate_limit_sleep": rate_limit_sleep,
     }
+
+
+def _has_api_key(provider: str) -> bool:
+    """Cek cepat apakah provider tertentu punya API key di env, tanpa raise."""
+    key_name = "NIM_API_KEY" if provider == "nvidia" else "GEMINI_API_KEY"
+    return bool(os.getenv(key_name))
 
 
 SOURCE_GUARD = (
@@ -264,16 +368,9 @@ def _build_variant_prompt(source_content: dict, jenis_konten: str) -> str:
             '{"pertanyaan": "...", "opsi_jawaban": ["...","...","...","..."], '
             '"alasan": "...", "jawaban_benar": "A"}. '
             "JANGAN pakai key lain seperti 'question', 'options', 'answer', atau 'correct_answer'. "
-            "Buat soal pilihan ganda baru dengan tepat 4 opsi. WAJIB ganti inti pertanyaan, "
-            "bukan hanya mengganti atau menambah opsi jawaban. JANGAN mempertahankan pola "
-            "pertanyaan lama seperti 'Apa yang dimaksud...', 'Apa yang dapat...', atau "
-            "pertanyaan definisi yang sama lalu hanya mengubah opsi menjadi daftar istilah "
-            "seperti 'Tuberkulosis' atau 'Emfisema'. Pertanyaan baru harus menguji sudut "
-            "berbeda: contoh penerapan, sebab-akibat, urutan proses, membandingkan dua konsep, "
-            "atau kasus singkat. Opsi jawaban harus berupa pernyataan/deskripsi lengkap yang "
-            "relevan dengan pertanyaan, bukan fragmen/butir istilah polos dan tidak boleh "
-            "diawali titik, bullet, atau label A/B/C/D. Pengecoh harus masuk akal, dan "
-            "jawaban_benar wajib salah satu dari A/B/C/D sesuai urutan opsi.\n\n"
+            "Buat soal pilihan ganda baru dengan tepat 4 opsi. Opsi jawaban tidak boleh "
+            "sekadar disalin dari versi lama; pengecoh harus masuk akal, dan jawaban_benar "
+            "wajib salah satu dari A/B/C/D sesuai urutan opsi.\n\n"
             f"Versi lama:\n{source_json}"
         )
     if jenis_konten == "rangkuman":
@@ -486,8 +583,7 @@ def reconcile_flashcard_and_soal(materi_text: str, draft: dict) -> dict:
     new_soal_result["parsed"] = reconciled_soal
 
     if len(reconciled_soal) < MIN_SOAL_COUNT:
-        config = _get_config()
-        new_soal_result = _topup_soal_if_needed(config, materi_text, new_soal_result)
+        new_soal_result = _topup_soal_if_needed(materi_text, new_soal_result)
         # Top-up bisa saja tanpa sengaja menghasilkan soal yang lagi-lagi
         # tumpang tindih dengan flashcard -- saring sekali lagi (tanpa
         # panggilan LLM baru) supaya hasil akhir tetap bersih.
@@ -500,12 +596,59 @@ def reconcile_flashcard_and_soal(materi_text: str, draft: dict) -> dict:
     return new_draft
 
 
+def _is_valid_soal_item(item) -> bool:
+    """
+    Validasi struktur minimal satu item soal SEBELUM masuk draft final.
+    LLM (terutama saat topup atau lewat jalur parsing fallback yang lebih
+    longgar) kadang menghasilkan item yang "kosong"/cacat -- mis. dict
+    tanpa field "pertanyaan" sama sekali, atau opsi_jawaban bukan list 4
+    elemen. Item seperti itu HARUS dibuang di sini, karena kalau lolos ke
+    backend-api, Prisma createMany() akan crash total ("Argument
+    `pertanyaan` is missing") dan menggagalkan SEMUA soal dalam draft,
+    termasuk yang valid.
+    """
+    if not isinstance(item, dict):
+        return False
+
+    pertanyaan = item.get("pertanyaan")
+    if not isinstance(pertanyaan, str) or not pertanyaan.strip():
+        return False
+
+    opsi = item.get("opsi_jawaban")
+    if not isinstance(opsi, list) or len(opsi) != 4:
+        return False
+    if any(not isinstance(o, str) or not o.strip() for o in opsi):
+        return False
+
+    jawaban_benar = str(item.get("jawaban_benar", "")).strip().upper()
+    if jawaban_benar not in ("A", "B", "C", "D"):
+        return False
+
+    return True
+
+
+def _is_valid_flashcard_item(item) -> bool:
+    """Validasi struktur minimal satu item flashcard, alasan sama seperti
+    _is_valid_soal_item -- cegah item kosong/cacat masuk draft final."""
+    if not isinstance(item, dict):
+        return False
+
+    pertanyaan = item.get("pertanyaan")
+    jawaban = item.get("jawaban")
+    return (
+        isinstance(pertanyaan, str) and pertanyaan.strip()
+        and isinstance(jawaban, str) and jawaban.strip()
+    )
+
+
 def _filter_non_materi_items(parsed, jenis_konten: str):
     """
     Guardrail setelah JSON berhasil diparse. Model kadang tetap membuat item dari
     halaman copyright/metadata walau prompt sudah melarangnya; item seperti itu
     tidak boleh masuk draft guru. Untuk jenis_konten "soal"/"flashcard" guardrail
-    ini juga membuang item yang duplikat/nyaris duplikat (lihat _deduplicate_items).
+    ini juga membuang item yang STRUKTURNYA CACAT (field wajib hilang/kosong --
+    lihat _is_valid_soal_item/_is_valid_flashcard_item) dan item yang
+    duplikat/nyaris duplikat (lihat _deduplicate_items).
     """
     if isinstance(parsed, list):
         if jenis_konten == "rangkuman":
@@ -525,14 +668,85 @@ def _filter_non_materi_items(parsed, jenis_konten: str):
             return filtered_blocks
 
         filtered = [item for item in parsed if not _is_non_materi_item(item)]
+
         if jenis_konten in {"soal", "flashcard"}:
+            validator = _is_valid_soal_item if jenis_konten == "soal" else _is_valid_flashcard_item
+            before_count = len(filtered)
+            filtered = [item for item in filtered if validator(item)]
+            dropped_count = before_count - len(filtered)
+            if dropped_count:
+                logger.warning(
+                    "Membuang %d item %s dengan struktur cacat/tidak lengkap "
+                    "(field wajib hilang) dari draft AI -- ini mencegah backend "
+                    "crash saat insert ke database.",
+                    dropped_count, jenis_konten,
+                )
             filtered = _deduplicate_items(filtered)
+
         return filtered
 
     if isinstance(parsed, dict) and _is_non_materi_item(parsed):
         return None
 
     return parsed
+
+
+def _call_provider(config: dict, prompt: str, jenis_konten: str) -> dict:
+    if config["provider"] == "nvidia":
+        return _generate_content_nvidia(config, prompt, jenis_konten)
+    return _generate_content_gemini(config, prompt, jenis_konten)
+
+
+def _generate_with_fallback(prompt: str, jenis_konten: str) -> dict:
+    """
+    Coba provider DEFAULT untuk jenis_konten ini dulu (lihat
+    _default_provider_for -- bisa beda-beda per jenis_konten kalau
+    AI_PROVIDER_FLASHCARD/RANGKUMAN/SOAL di-set, task-splitting). Kalau
+    provider itu gagal total (semua retry internal habis / NIMAPIError),
+    otomatis coba provider satunya sebagai backup -- SELAMA API key backup
+    itu tersedia di env. Kalau backup juga gagal, error asli dari provider
+    utama yang dilempar ke caller (supaya pesan errornya tetap informatif).
+
+    Catatan token: task-splitting di sini TIDAK menggandakan biaya token --
+    dalam kondisi normal (provider utama berhasil), tetap hanya SATU
+    panggilan LLM per generate. Backup hanya terpakai saat provider utama
+    benar-benar gagal (jaringan/rate-limit/response invalid).
+    """
+    primary_provider = _default_provider_for(jenis_konten)
+    backup_provider = "nvidia" if primary_provider == "gemini" else "gemini"
+
+    primary_config = _get_config(primary_provider, jenis_konten)
+
+    try:
+        return _call_provider(primary_config, prompt, jenis_konten)
+    except NIMAPIError as primary_error:
+        if not _has_api_key(backup_provider):
+            logger.warning(
+                "Provider utama (%s) untuk jenis_konten=%s gagal dan backup (%s) "
+                "tidak punya API key, melempar error asli.",
+                primary_provider, jenis_konten, backup_provider,
+            )
+            raise
+
+        logger.warning(
+            "Provider utama (%s) untuk jenis_konten=%s gagal (%s), mencoba backup (%s)...",
+            primary_provider, jenis_konten, primary_error, backup_provider,
+        )
+        try:
+            backup_config = _get_config(backup_provider, jenis_konten)
+            result = _call_provider(backup_config, prompt, jenis_konten)
+            logger.info(
+                "Backup provider (%s) berhasil menggantikan %s untuk jenis_konten=%s.",
+                backup_provider, primary_provider, jenis_konten,
+            )
+            return result
+        except NIMAPIError as backup_error:
+            logger.error(
+                "Backup provider (%s) juga gagal (%s) untuk jenis_konten=%s. "
+                "Melempar error dari provider utama.",
+                backup_provider, backup_error, jenis_konten,
+            )
+            raise primary_error from backup_error
 
 
 def generate_content(materi_text: str, jenis_konten: str) -> dict:
@@ -547,21 +761,16 @@ def generate_content(materi_text: str, jenis_konten: str) -> dict:
         dict hasil parse JSON dari response LLM, dengan key "raw_text" sebagai fallback
         jika parsing JSON gagal (supaya guru tetap bisa review manual di frontend).
     """
-    config = _get_config()
     prompt = _build_prompt(materi_text, jenis_konten)
-
-    if config["provider"] == "nvidia":
-        result = _generate_content_nvidia(config, prompt, jenis_konten)
-    else:
-        result = _generate_content_gemini(config, prompt, jenis_konten)
+    result = _generate_with_fallback(prompt, jenis_konten)
 
     if jenis_konten == "soal":
-        result = _topup_soal_if_needed(config, materi_text, result)
+        result = _topup_soal_if_needed(materi_text, result)
 
     return result
 
 
-def _topup_soal_if_needed(config: dict, materi_text: str, result: dict) -> dict:
+def _topup_soal_if_needed(materi_text: str, result: dict) -> dict:
     """
     Kalau bank soal hasil generate awal (setelah dedup di _filter_non_materi_items)
     masih kurang dari MIN_SOAL_COUNT, minta LLM generate soal TAMBAHAN yang
@@ -569,6 +778,9 @@ def _topup_soal_if_needed(config: dict, materi_text: str, result: dict) -> dict:
     _build_soal_topup_prompt) supaya tidak mengulang -- bukan sekadar minta
     ulang dari nol dengan angka lebih besar, karena itu yang tadinya bikin
     soal berulang saat materi sumber tipis.
+
+    Top-up ikut memakai _generate_with_fallback (provider default untuk
+    "soal" + backup otomatis kalau gagal), konsisten dengan generate awal.
 
     Berhenti lebih awal (sebelum MAX_SOAL_TOPUP_ATTEMPTS habis) begitu satu
     putaran top-up tidak menambah soal unik sama sekali -- tandanya materi
@@ -590,10 +802,7 @@ def _topup_soal_if_needed(config: dict, materi_text: str, result: dict) -> dict:
 
         topup_prompt = _build_soal_topup_prompt(materi_text, parsed)
         try:
-            if config["provider"] == "nvidia":
-                topup_result = _generate_content_nvidia(config, topup_prompt, "soal")
-            else:
-                topup_result = _generate_content_gemini(config, topup_prompt, "soal")
+            topup_result = _generate_with_fallback(topup_prompt, "soal")
         except NIMAPIError as e:
             logger.warning("Gagal top-up bank soal (percobaan %d): %s", attempts, e)
             break
@@ -624,13 +833,8 @@ def _topup_soal_if_needed(config: dict, materi_text: str, result: dict) -> dict:
 
 
 def generate_variant(source_content: dict, jenis_konten: str) -> dict:
-    config = _get_config()
     prompt = _build_variant_prompt(source_content, jenis_konten)
-
-    if config["provider"] == "nvidia":
-        return _generate_content_nvidia(config, prompt, jenis_konten)
-
-    return _generate_content_gemini(config, prompt, jenis_konten)
+    return _generate_with_fallback(prompt, jenis_konten)
 
 
 def _generate_content_nvidia(config: dict, prompt: str, jenis_konten: str) -> dict:

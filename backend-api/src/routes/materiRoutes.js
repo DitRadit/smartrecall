@@ -34,6 +34,9 @@ router.get('/:id/generate-progress', requireAuth, requireRole('guru'), materiCon
 // GET /materi/:id/draft (guru)
 router.get('/:id/draft', requireAuth, requireRole('guru'), materiController.getMateriDraft);
 
+// GET /materi/:id/ppt/siswa - siswa download PPT dari materi published
+router.get('/:id/ppt/siswa', requireAuth, materiController.downloadMateriPptSiswa);
+
 // GET /materi/:id/ppt (guru) - download PPT hasil generate opsional
 router.get('/:id/ppt', requireAuth, requireRole('guru'), materiController.downloadMateriPpt);
 

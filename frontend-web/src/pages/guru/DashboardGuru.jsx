@@ -25,9 +25,68 @@ export default function DashboardGuru() {
   const [currentParentId, setCurrentParentId] = useState(null);
   const [breadcrumb, setBreadcrumb] = useState([{ id: null, nama: 'Beranda' }]);
 
+  // Sesi Aktif: folder yang sedang dibagikan ke siswa
+  const [activeGroupId, setActiveGroupId] = useState(null);
+  const [activeGroupNama, setActiveGroupNama] = useState(null);
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [sessionError, setSessionError] = useState('');
+  // Daftar folder root untuk dropdown pilih sesi
+  const [rootGroups, setRootGroups] = useState([]);
+  const [showSessionPicker, setShowSessionPicker] = useState(false);
+
   useEffect(() => {
     loadContents();
   }, [currentParentId]);
+
+  useEffect(() => {
+    // Ambil status sesi aktif guru saat mount
+    api.get('/auth/me')
+      .then((res) => {
+        const agId = res.data.user?.activeGroupId || null;
+        setActiveGroupId(agId);
+        if (agId) {
+          // Cari nama foldernya dari daftar grup yang sudah/akan di-load
+          api.get('/groups').then((r) => {
+            const allFolders = r.data.groups || [];
+            setRootGroups(allFolders);
+            const found = allFolders.find((g) => g.id === agId);
+            setActiveGroupNama(found?.nama || `Folder #${agId}`);
+          }).catch(() => {});
+        } else {
+          api.get('/groups').then((r) => setRootGroups(r.data.groups || [])).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleStartSession(groupId, groupNama) {
+    setSessionBusy(true);
+    setSessionError('');
+    try {
+      await api.put('/auth/active-group', { groupId });
+      setActiveGroupId(groupId);
+      setActiveGroupNama(groupNama);
+      setShowSessionPicker(false);
+    } catch (err) {
+      setSessionError(err.response?.data?.message || 'Gagal memulai sesi');
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  async function handleEndSession() {
+    setSessionBusy(true);
+    setSessionError('');
+    try {
+      await api.put('/auth/active-group', { groupId: null });
+      setActiveGroupId(null);
+      setActiveGroupNama(null);
+    } catch (err) {
+      setSessionError(err.response?.data?.message || 'Gagal mengakhiri sesi');
+    } finally {
+      setSessionBusy(false);
+    }
+  }
 
   function loadContents() {
     const query = currentParentId ? `?parentId=${currentParentId}` : '';
@@ -383,12 +442,84 @@ export default function DashboardGuru() {
         </div>
       )}
 
+      {/* ── Panel Sesi Kelas ── */}
+      <div className="px-container-padding pt-gutter">
+        <div className={`rounded-xl border p-4 flex flex-wrap items-center gap-4 ${activeGroupId ? 'border-tertiary-container bg-tertiary-container/30' : 'border-outline-variant bg-surface-container-lowest'}`}>
+          <div className="flex items-center gap-3 flex-grow min-w-0">
+            <span className={`material-symbols-outlined text-[28px] ${activeGroupId ? 'text-on-tertiary-container' : 'text-on-surface-variant'}`}>
+              {activeGroupId ? 'wifi' : 'wifi_off'}
+            </span>
+            <div className="min-w-0">
+              <p className="text-label-md font-semibold text-on-surface">Sesi Kelas</p>
+              {activeGroupId ? (
+                <p className="text-body-sm text-on-tertiary-container truncate">
+                  Aktif: <strong>{activeGroupNama}</strong> — siswa yang connect dapat melihat materi ini
+                </p>
+              ) : (
+                <p className="text-body-sm text-on-surface-variant">Belum ada sesi aktif — siswa tidak melihat materi apapun</p>
+              )}
+              {sessionError && <p className="text-label-sm text-error mt-1">{sessionError}</p>}
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            {activeGroupId ? (
+              <button
+                type="button"
+                onClick={handleEndSession}
+                disabled={sessionBusy}
+                className="h-9 px-4 rounded-lg border border-error text-label-md text-error hover:bg-error-container disabled:opacity-60"
+              >
+                {sessionBusy ? 'Memproses...' : 'Akhiri Sesi'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setShowSessionPicker((v) => !v)}
+              disabled={sessionBusy}
+              className="h-9 px-4 rounded-lg bg-primary text-on-primary text-label-md font-semibold hover:bg-primary/90 disabled:opacity-60"
+            >
+              {activeGroupId ? 'Ganti Sesi' : 'Mulai Sesi'}
+            </button>
+          </div>
+        </div>
+
+        {/* Dropdown pilih folder sesi */}
+        {showSessionPicker && (
+          <div className="mt-2 rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg p-3 space-y-1 max-h-60 overflow-y-auto">
+            {rootGroups.length === 0 ? (
+              <p className="text-body-sm text-on-surface-variant px-2 py-1">Belum ada folder. Buat folder kelas terlebih dahulu.</p>
+            ) : (
+              rootGroups.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => handleStartSession(g.id, g.nama)}
+                  disabled={sessionBusy}
+                  className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-container text-label-md ${activeGroupId === g.id ? 'text-primary font-semibold bg-surface-container' : 'text-on-surface'}`}
+                >
+                  <span className="material-symbols-outlined text-[18px] text-secondary">folder</span>
+                  {g.nama}
+                  {activeGroupId === g.id && <span className="ml-auto material-symbols-outlined text-[16px] text-primary">check</span>}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
       <header className="flex flex-wrap justify-between items-center gap-4 px-container-padding py-stack-md">
         <div className="flex flex-col">
           <h2 className="text-headline-lg text-primary">Materi Saya</h2>
           <p className="text-body-md text-on-surface-variant">Kelola konten edukasi untuk siswa Anda.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            to="/guru/pengguna"
+            className="bg-surface-container text-on-surface h-touch-target-min px-4 rounded-xl flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95 border border-outline-variant"
+          >
+            <span className="material-symbols-outlined">manage_accounts</span>
+            <span className="text-label-md">Pengguna</span>
+          </Link>
           <button
             onClick={() => setIsCreateGroupOpen(true)}
             className="bg-secondary-container text-on-secondary-container h-touch-target-min px-6 rounded-xl flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
@@ -405,6 +536,7 @@ export default function DashboardGuru() {
           </Link>
         </div>
       </header>
+
 
       <div className="px-container-padding pb-4">
         {currentParentId && (

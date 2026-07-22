@@ -92,6 +92,68 @@ async function registerSiswa(req, res) {
 }
 
 /**
+ * GET /auth/me
+ * Ambil data user yang sedang login (termasuk activeGroupId untuk guru).
+ */
+async function getMe(req, res) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, nama: true, role: true, username: true, nis: true, kelasId: true, activeGroupId: true },
+    });
+    if (!user) {
+      return res.status(404).json({ error: 'not_found', message: 'User tidak ditemukan' });
+    }
+    return res.status(200).json({ user });
+  } catch (err) {
+    console.error('getMe error:', err);
+    return res.status(500).json({ error: 'internal_error', message: 'Gagal mengambil data user' });
+  }
+}
+
+/**
+ * PUT /auth/active-group
+ * Guru set atau clear folder sesi aktif. Body: { groupId: number | null }
+ * Jika groupId null → sesi diakhiri, siswa tidak bisa lihat apapun.
+ */
+async function setActiveGroup(req, res) {
+  try {
+    const { groupId } = req.body;
+    const parsedGroupId = groupId === undefined || groupId === null || groupId === ''
+      ? null
+      : parseInt(groupId, 10);
+
+    if (parsedGroupId !== null && Number.isNaN(parsedGroupId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'groupId tidak valid' });
+    }
+
+    // Pastikan folder milik guru ini (jika bukan null)
+    if (parsedGroupId !== null) {
+      const group = await prisma.group.findFirst({
+        where: { id: parsedGroupId, guruId: req.user.id },
+        select: { id: true, nama: true },
+      });
+      if (!group) {
+        return res.status(404).json({ error: 'not_found', message: 'Folder tidak ditemukan atau bukan milik Anda' });
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { activeGroupId: parsedGroupId },
+    });
+
+    return res.status(200).json({
+      message: parsedGroupId ? 'Sesi kelas dimulai' : 'Sesi kelas diakhiri',
+      activeGroupId: parsedGroupId,
+    });
+  } catch (err) {
+    console.error('setActiveGroup error:', err);
+    return res.status(500).json({ error: 'internal_error', message: 'Gagal mengatur sesi kelas' });
+  }
+}
+
+/**
  * POST /auth/login
  * Login untuk guru maupun siswa: username + password.
  */
@@ -123,4 +185,4 @@ async function login(req, res) {
   }
 }
 
-module.exports = { registerGuru, registerSiswa, login };
+module.exports = { registerGuru, registerSiswa, login, getMe, setActiveGroup };
