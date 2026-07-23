@@ -16,10 +16,16 @@ export default function Profil() {
       title: 'Yakin ingin keluar?',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
       confirmButtonText: 'Ya, Keluar',
-      cancelButtonText: 'Batal'
+      cancelButtonText: 'Batal',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant',
+        title: 'text-headline-md font-bold text-on-surface font-sans',
+        actions: 'flex gap-3 mt-6',
+        confirmButton: 'h-touch-target-min px-6 rounded-lg text-label-md bg-error text-on-error font-semibold hover:opacity-90 transition-opacity',
+        cancelButton: 'h-touch-target-min px-6 rounded-lg border border-outline-variant text-label-md text-on-surface-variant font-semibold hover:bg-surface-container transition-colors'
+      }
     }).then((result) => {
       if (result.isConfirmed) {
         logout();

@@ -78,7 +78,11 @@ export default function ReviewDraftAI() {
           icon: 'success',
           title: 'Berhasil mempublish materi!',
           showConfirmButton: false,
-          timer: 1000
+          timer: 1000,
+          customClass: {
+            popup: 'bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant',
+            title: 'text-headline-md font-bold text-on-surface font-sans',
+          }
         }).then(() => {
           navigate('/guru/dashboard', { state: location.state });
         });
