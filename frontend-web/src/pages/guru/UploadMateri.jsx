@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
 import api from '../../services/api';
 import AiProgressBar from '../../components/AiProgressBar';
 
@@ -23,6 +24,7 @@ export default function UploadMateri() {
   const [loading, setLoading] = useState(false);
   const [aiProgress, setAiProgress] = useState(null);
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const groupId = searchParams.get('groupId');
 
   function formatProgress(progress) {
@@ -54,7 +56,20 @@ export default function UploadMateri() {
         if (nextProgress) setAiProgress(nextProgress);
 
         if (nextProgress?.status === 'done') {
-          setStatus({ type: 'success', message: 'Generate AI selesai. Materi siap direview di dashboard.' });
+          Swal.fire({
+            icon: 'success',
+            title: 'Generate AI Selesai!',
+            text: 'Materi siap direview.',
+            showConfirmButton: false,
+            timer: 1500,
+            customClass: {
+              popup: 'bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant',
+              title: 'text-headline-md font-bold text-on-surface font-sans',
+              htmlContainer: 'text-body-md text-on-surface-variant'
+            }
+          }).then(() => {
+            navigate('/guru/dashboard', { state: { returnGroupId: groupId ? Number(groupId) : null } });
+          });
           return;
         }
         if (nextProgress?.status === 'error') {
