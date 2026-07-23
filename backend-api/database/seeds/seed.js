@@ -10,6 +10,18 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
+  const adminPasswordHash = await bcrypt.hash('admin123', 10);
+  const admin = await prisma.user.upsert({
+    where: { username: 'admin_demo' },
+    update: {},
+    create: {
+      nama: 'Admin Sekolah',
+      role: 'admin',
+      username: 'admin_demo',
+      passwordHash: adminPasswordHash,
+    },
+  });
+
   const guruPasswordHash = await bcrypt.hash('guru123', 10);
   const guru = await prisma.user.upsert({
     where: { username: 'guru_demo' },
@@ -22,6 +34,13 @@ async function main() {
     },
   });
 
+  // Kelas harus dibuat dulu sebelum bisa direferensikan siswa
+  const kelas = await prisma.kelas.upsert({
+    where: { nama: 'Kelas 7A' },
+    update: {},
+    create: { nama: 'Kelas 7A' },
+  });
+
   const siswaPasswordHash = await bcrypt.hash('siswa123', 10);
   const siswa = await prisma.user.upsert({
     where: { username: 'siswa_demo' },
@@ -32,7 +51,7 @@ async function main() {
       username: 'siswa_demo',
       passwordHash: siswaPasswordHash,
       nis: '1234567890',
-      kelasId: 'kelas-7a',
+      kelasId: kelas.id,
     },
   });
 
@@ -51,7 +70,8 @@ async function main() {
     },
   });
 
-  console.log('Seed selesai:', { guru: guru.username, siswa: siswa.username, materi: materi.judul });
+  console.log('Seed selesai:', { admin: admin.username, guru: guru.username, siswa: siswa.username, kelas: kelas.nama, materi: materi.judul });
+  console.log('Login admin : username=admin_demo, password=admin123');
   console.log('Login guru  : username=guru_demo, password=guru123');
   console.log('Login siswa : username=siswa_demo, password=siswa123');
 }
