@@ -37,6 +37,9 @@ router.get('/:id/draft', requireAuth, requireRole('guru'), materiController.getM
 // GET /materi/:id/ppt/siswa - siswa download PPT dari materi published
 router.get('/:id/ppt/siswa', requireAuth, materiController.downloadMateriPptSiswa);
 
+// POST /materi/:id/log-download - catat aktivitas download materi
+router.post('/:id/log-download', requireAuth, materiController.logDownloadMateri);
+
 // GET /materi/:id/ppt (guru) - download PPT hasil generate opsional
 router.get('/:id/ppt', requireAuth, requireRole('guru'), materiController.downloadMateriPpt);
 

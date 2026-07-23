@@ -198,7 +198,7 @@ async function login(req, res) {
     // Log login activity (keep only the latest by deleting old ones)
     try {
       await prisma.activityLog.deleteMany({
-        where: { userId: user.id, action: 'LOGIN' },
+        where: { userId: user.id },
       });
       await prisma.activityLog.create({
         data: {

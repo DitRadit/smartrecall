@@ -2,6 +2,9 @@ const prisma = require('../config/db');
 
 async function logActivity(userId, action, description) {
   try {
+    await prisma.activityLog.deleteMany({
+      where: { userId }
+    });
     await prisma.activityLog.create({
       data: {
         userId,

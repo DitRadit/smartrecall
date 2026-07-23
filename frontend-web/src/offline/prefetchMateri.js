@@ -67,6 +67,14 @@ export async function downloadMateriForOffline(materiId, siswaId) {
     })(),
   ]);
 
+  try {
+    if (result.rangkuman || result.flashcard || result.soal) {
+      await api.post(`/materi/${materiId}/log-download`);
+    }
+  } catch (err) {
+    // Abaikan jika gagal log
+  }
+
   return result;
 }
 

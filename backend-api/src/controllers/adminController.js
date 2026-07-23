@@ -21,13 +21,23 @@ async function getAdminDashboardStats(req, res) {
     });
 
     // Aktivitas terbaru
-    const latestActivities = await prisma.activityLog.findMany({
-      take: 10,
+    const rawActivities = await prisma.activityLog.findMany({
+      take: 50,
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { nama: true, role: true } },
       },
     });
+
+    const seenUsers = new Set();
+    const latestActivities = [];
+    for (const act of rawActivities) {
+      if (!seenUsers.has(act.userId)) {
+        seenUsers.add(act.userId);
+        latestActivities.push(act);
+        if (latestActivities.length >= 10) break;
+      }
+    }
 
     // Distribusi aktivitas (guru vs siswa vs admin)
     const distribution = await prisma.activityLog.groupBy({

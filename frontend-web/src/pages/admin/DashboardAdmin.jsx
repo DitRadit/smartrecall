@@ -86,6 +86,7 @@ export default function DashboardAdmin() {
                   <tr>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Pengguna</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Aksi</th>
+                  <th className="px-6 py-4 text-label-md text-on-surface-variant">Deskripsi</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Waktu</th>
                 </tr>
               </thead>
@@ -102,21 +103,24 @@ export default function DashboardAdmin() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        {act.action === 'LOGIN' || act.action === 'LOGOUT' ? (
-                          isOnline ? (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label-sm bg-green-100 text-green-700 font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                              Online
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label-sm bg-surface-container text-on-surface-variant font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
-                              Offline
-                            </span>
-                          )
+                        {isOnline ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label-sm bg-green-100 text-green-700 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                            Online
+                          </span>
                         ) : (
-                          <span className="text-body-md font-medium text-primary">{act.action}</span>
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label-sm bg-surface-container text-on-surface-variant font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+                            Offline
+                          </span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-body-sm text-on-surface-variant">
+                        {act.action === 'GENERATE_MATERI' ? 'Sedang generate materi' :
+                         act.action === 'GENERATE_PPT' ? 'Sedang generate PPT' :
+                         act.action === 'DOWNLOAD_MATERI' ? 'Mendownload materi' :
+                         act.action === 'KERJAKAN_FLASHCARD' ? 'Mengerjakan flashcard' :
+                         act.action === 'KERJAKAN_KUIS' ? 'Mengerjakan kuis' : ''}
                       </td>
                       <td className="px-6 py-4 text-body-sm text-on-surface-variant">{formatDateTime(act.createdAt)}</td>
                     </tr>

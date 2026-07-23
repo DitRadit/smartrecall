@@ -195,6 +195,9 @@ async function submitQuiz(req, res) {
     });
 
     // Logging Activity
+    await prisma.activityLog.deleteMany({
+      where: { userId: siswaId }
+    });
     await prisma.activityLog.create({
       data: {
         userId: siswaId,

@@ -84,6 +84,18 @@ async function submitReview(req, res) {
       data: { lastSyncAt: new Date() },
     });
 
+    // Logging Activity
+    await prisma.activityLog.deleteMany({
+      where: { userId: siswaId }
+    });
+    await prisma.activityLog.create({
+      data: {
+        userId: siswaId,
+        action: 'KERJAKAN_FLASHCARD',
+        description: `Siswa ${req.user.nama || ''} mengerjakan flashcard`,
+      },
+    });
+
     return res.status(200).json({ progress });
   } catch (err) {
     console.error('submitReview error:', err);

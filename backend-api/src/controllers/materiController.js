@@ -148,6 +148,9 @@ async function uploadMateri(req, res) {
     });
 
     // Logging Activity
+    await prisma.activityLog.deleteMany({
+      where: { userId: req.user.id }
+    });
     await prisma.activityLog.create({
       data: {
         userId: req.user.id,
@@ -499,6 +502,19 @@ async function downloadMateriPptSiswa(req, res) {
 
     const fullPath = path.join(GENERATED_PPT_DIR, materi.pptFile);
     const downloadName = `${sanitizeFilename(materi.judul)}.pptx`;
+
+    // Logging Activity
+    if (req.user && req.user.id) {
+      await prisma.activityLog.deleteMany({ where: { userId: req.user.id } });
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'DOWNLOAD_MATERI',
+          description: `Siswa ${req.user.nama || ''} mengunduh materi "${materi.judul}"`,
+        },
+      });
+    }
+
     return res.download(fullPath, downloadName);
   } catch (err) {
     console.error('downloadMateriPptSiswa error:', err);
@@ -637,6 +653,32 @@ async function moveMateri(req, res) {
   }
 }
 
+async function logDownloadMateri(req, res) {
+  try {
+    const materiId = parseInt(req.params.id, 10);
+    const materi = await prisma.materi.findFirst({
+      where: { id: materiId },
+      select: { judul: true },
+    });
+
+    if (materi && req.user && req.user.id) {
+      await prisma.activityLog.deleteMany({ where: { userId: req.user.id } });
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'DOWNLOAD_MATERI',
+          description: `Siswa ${req.user.nama || ''} mengunduh materi "${materi.judul}"`,
+        },
+      });
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('logDownloadMateri error:', err);
+    return res.status(500).json({ error: 'internal_error' });
+  }
+}
+
 module.exports = {
   uploadMateri,
   listMateri,
@@ -648,4 +690,5 @@ module.exports = {
   downloadMateriPpt,
   downloadMateriPptSiswa,
   generateAIContentInBackground,
+  logDownloadMateri,
 };
