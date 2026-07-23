@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
 /**
@@ -39,6 +39,18 @@ export default function DashboardGuru() {
   const [showSessionPicker, setShowSessionPicker] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [selectedKelasId, setSelectedKelasId] = useState('');
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.returnGroupId !== undefined) {
+      setCurrentParentId(location.state.returnGroupId);
+      if (location.state.breadcrumb) {
+        setBreadcrumb(location.state.breadcrumb);
+      }
+    }
+  }, [location.state]);
 
   useEffect(() => {
     loadContents();
@@ -738,7 +750,8 @@ export default function DashboardGuru() {
                       setDraggedItem(null);
                       setDropTargetId(null);
                     }}
-                    className="hover:bg-surface-container-low transition-colors cursor-grab active:cursor-grabbing"
+                    onClick={() => navigate(`/guru/review/${m.id}`, { state: { returnGroupId: currentParentId, breadcrumb } })}
+                    className="hover:bg-surface-container-low transition-colors cursor-pointer active:cursor-grabbing"
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -765,7 +778,7 @@ export default function DashboardGuru() {
                         {m.pptFile && (
                           <button
                             type="button"
-                            onClick={() => downloadPpt(m)}
+                            onClick={(e) => { e.stopPropagation(); downloadPpt(m); }}
                             className="text-primary hover:underline text-xs inline-flex items-center"
                           >
                             <span className="material-symbols-outlined text-[14px]">download</span> PPT
@@ -777,6 +790,8 @@ export default function DashboardGuru() {
                       <div className="flex items-center justify-end gap-4">
                         <Link
                           to={`/guru/review/${m.id}`}
+                          state={{ returnGroupId: currentParentId, breadcrumb }}
+                          onClick={(e) => e.stopPropagation()}
                           className="text-primary hover:underline text-label-sm inline-flex items-center gap-1"
                         >
                           <span className="material-symbols-outlined text-[18px]">
@@ -786,7 +801,7 @@ export default function DashboardGuru() {
                         </Link>
                         <button
                           type="button"
-                          onClick={() => handleDelete(m)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(m); }}
                           disabled={deletingId === m.id}
                           className="text-error hover:underline text-label-sm inline-flex items-center gap-1 disabled:opacity-50"
                         >
