@@ -89,12 +89,7 @@ export default function ReviewDraftAI() {
             title: 'text-headline-md font-bold text-on-surface font-sans',
           }
         }).then(() => {
-          navigate('/guru/dashboard', { 
-            state: { 
-              returnGroupId: location.state?.returnGroupId ?? materi.groupId ?? null,
-              breadcrumb: location.state?.breadcrumb 
-            } 
-          });
+          navigate('/guru/dashboard');
         });
       } else {
         await loadDraft();

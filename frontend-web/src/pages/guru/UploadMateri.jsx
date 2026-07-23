@@ -69,12 +69,7 @@ export default function UploadMateri() {
               htmlContainer: 'text-body-md text-on-surface-variant'
             }
           }).then(() => {
-            navigate('/guru/dashboard', { 
-              state: { 
-                returnGroupId: groupId ? Number(groupId) : null,
-                breadcrumb: location.state?.breadcrumb 
-              } 
-            });
+            navigate('/guru/dashboard');
           });
           return;
         }
