@@ -80,8 +80,9 @@ python app.py
 cd backend-api
 npm install
 cp .env.example .env
-npx prisma migrate dev
-npm start
+nnpx prisma migrate dev --name init
+npx prisma generate
+npm run dev
 ```
 
 **3. Frontend Web (React)**
@@ -89,7 +90,7 @@ npm start
 cd frontend-web
 npm install
 cp .env.example .env
-npm run dev
+npm run dev -- --host
 ```
 
 ### Project Structure
@@ -223,11 +224,13 @@ python app.py
 
 # Terminal 2: Backend API (port 3000)
 cd backend-api
-npm start
+npx prisma migrate dev --name init
+npx prisma generate
+npm run dev
 
 # Terminal 3: Frontend Web (port 5173)
 cd frontend-web
-npm run dev
+npm run dev -- --host
 ```
 
 Then open: http://localhost:5173
