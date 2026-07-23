@@ -35,12 +35,14 @@ export default function DaftarMateri() {
   const [downloadingId, setDownloadingId] = useState(null);
   // downloadingPptId = materi yang PPT-nya sedang diunduh
   const [downloadingPptId, setDownloadingPptId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     loadMateri();
   }, []);
 
   async function loadMateri(parentId = null) {
+    setIsLoading(true);
     try {
       const query = parentId ? `?parentId=${parentId}` : '';
       const response = await api.get(`/groups${query}`);
@@ -79,6 +81,8 @@ export default function DaftarMateri() {
       setCurrentParentId(parentId);
       setIsOffline(true);
       await refreshOfflineStatus(offlineMateri);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -198,10 +202,18 @@ export default function DaftarMateri() {
           </div>
         </div>
 
-        {groupList.length === 0 && materiList.length === 0 && (
+        {isLoading && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-on-surface-variant">
+              <span className="material-symbols-outlined animate-spin text-[40px] text-primary">progress_activity</span>
+              <p className="text-body-lg font-medium">Memuat Folder & Materi...</p>
+            </div>
+        )}
+
+        {!isLoading && groupList.length === 0 && materiList.length === 0 && (
           <p className="text-body-md text-on-surface-variant">Belum ada materi yang tersedia.</p>
         )}
 
+        {!isLoading && (
         <div className="space-y-4">
           {groupList.map((g) => (
             <button
@@ -340,6 +352,7 @@ export default function DaftarMateri() {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );

@@ -75,9 +75,22 @@ async function createGroup(req, res) {
       }
     }
 
+    const trimmedNama = nama.trim();
+    const existingName = await prisma.group.findFirst({
+      where: {
+        guruId: req.user.id,
+        parentId: parsedParentId,
+        nama: trimmedNama
+      }
+    });
+
+    if (existingName) {
+      return res.status(400).json({ error: 'conflict', message: 'Nama folder sudah ada di lokasi ini' });
+    }
+
     const group = await prisma.group.create({
       data: {
-        nama,
+        nama: trimmedNama,
         guruId: req.user.id,
         parentId: parsedParentId,
       },
@@ -235,7 +248,7 @@ async function updateGroup(req, res) {
 
     const existing = await prisma.group.findFirst({
       where: { id: groupId, guruId: req.user.id },
-      select: { id: true },
+      select: { id: true, nama: true, parentId: true },
     });
 
     if (!existing) {
@@ -272,6 +285,23 @@ async function updateGroup(req, res) {
 
     if (Object.keys(data).length === 0) {
       return res.status(400).json({ error: 'bad_request', message: 'Tidak ada perubahan yang dikirim' });
+    }
+
+    const targetNama = data.nama || existing.nama;
+    const targetParentId = hasParentId ? data.parentId : existing.parentId;
+
+    if (data.nama !== undefined || hasParentId) {
+      const duplicate = await prisma.group.findFirst({
+        where: {
+          guruId: req.user.id,
+          parentId: targetParentId,
+          nama: targetNama,
+          id: { not: groupId }
+        }
+      });
+      if (duplicate) {
+        return res.status(400).json({ error: 'conflict', message: 'Nama folder sudah ada di lokasi tujuan' });
+      }
     }
 
     await prisma.group.update({

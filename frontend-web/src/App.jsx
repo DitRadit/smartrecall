@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './services/authContext';
+import { AuthProvider, useAuth } from './services/authContext';
 import PrivateRoute from './components/PrivateRoute';
 import Layout from './components/Layout';
 
@@ -21,14 +21,33 @@ import DashboardAdmin from './pages/admin/DashboardAdmin';
 /**
  * App.jsx - Routing dibedakan role guru/siswa (PRD.md bagian 10, ARCHITECTURE.md).
  */
+
+function RootRedirect() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+  if (user.role === 'guru') return <Navigate to="/guru/dashboard" replace />;
+  return <Navigate to="/siswa/materi" replace />;
+}
+
+function LoginRoute() {
+  const { user } = useAuth();
+  if (user) {
+    if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (user.role === 'guru') return <Navigate to="/guru/dashboard" replace />;
+    return <Navigate to="/siswa/materi" replace />;
+  }
+  return <Login />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Layout>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="/login" element={<LoginRoute />} />
 
             <Route
               path="/profil"

@@ -22,9 +22,9 @@ export default function Login() {
     try {
       const user = await login(username, password);
       if (user.role === 'admin') {
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       } else {
-        navigate(user.role === 'guru' ? '/guru/dashboard' : '/siswa/materi');
+        navigate(user.role === 'guru' ? '/guru/dashboard' : '/siswa/materi', { replace: true });
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Login gagal. Periksa username/password.');
@@ -42,7 +42,7 @@ export default function Login() {
           </div>
           <h1 className="text-headline-lg-mobile text-primary tracking-tight">SmartRecall</h1>
           <p className="text-body-md text-on-surface-variant max-w-[280px] leading-tight mt-1">
-            Belajar Kapan Saja, Di Mana Saja <span className="text-secondary font-bold">(Tanpa Internet)</span>
+            Belajar Kapan Saja, Di Mana Saja Tanpa Internet
           </p>
         </div>
 
@@ -106,10 +106,10 @@ export default function Login() {
           </form>
         </div>
 
-        <div className="mt-stack-lg flex items-center gap-2 text-on-surface-variant bg-secondary-container/20 px-4 py-2 rounded-full border border-secondary-container/30">
+        {/* <div className="mt-stack-lg flex items-center gap-2 text-on-surface-variant bg-secondary-container/20 px-4 py-2 rounded-full border border-secondary-container/30">
           <span className="material-symbols-outlined text-[18px] text-secondary">wifi_off</span>
           <span className="text-label-sm">Bekerja penuh secara offline</span>
-        </div>
+        </div> */}
       </main>
     </div>
   );

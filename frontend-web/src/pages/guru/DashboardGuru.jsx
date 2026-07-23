@@ -32,6 +32,7 @@ export default function DashboardGuru() {
   const [activeKelasNama, setActiveKelasNama] = useState(null);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionError, setSessionError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   // Daftar folder root dan kelas untuk dropdown pilih sesi
   const [rootGroups, setRootGroups] = useState([]);
   const [kelasList, setKelasList] = useState([]);
@@ -123,6 +124,7 @@ export default function DashboardGuru() {
   }
 
   function loadContents() {
+    setIsLoading(true);
     const query = currentParentId ? `?parentId=${currentParentId}` : '';
     api
       .get(`/groups${query}`)
@@ -131,7 +133,8 @@ export default function DashboardGuru() {
         setMateriList(res.data.materi || []);
         setError('');
       })
-      .catch((err) => setError(err.response?.data?.message || 'Gagal memuat daftar materi dan folder.'));
+      .catch((err) => setError(err.response?.data?.message || 'Gagal memuat daftar materi dan folder.'))
+      .finally(() => setIsLoading(false));
   }
 
   async function handleCreateGroup(event) {
@@ -644,9 +647,26 @@ export default function DashboardGuru() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
-                
+                {isLoading && (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-8 text-center text-on-surface-variant">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <span className="material-symbols-outlined animate-spin text-[32px] text-primary">progress_activity</span>
+                        <p className="text-body-md">Memuat folder dan materi...</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {!isLoading && groupList.length === 0 && materiList.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-8 text-center text-on-surface-variant">
+                      Belum ada materi atau folder. Klik "Upload Materi" atau "Buat Folder" untuk memulai.
+                    </td>
+                  </tr>
+                )}
+
                 {/* RENDER FOLDERS (GROUPS) FIRST */}
-                {groupList.map((g) => (
+                {!isLoading && groupList.map((g) => (
                   <tr
                     key={`group-${g.id}`}
                     draggable
@@ -708,8 +728,8 @@ export default function DashboardGuru() {
                   </tr>
                 ))}
 
-                {/* RENDER MATERI */}
-                {materiList.map((m) => (
+                {/* RENDER MATERI THEN */}
+                {!isLoading && materiList.map((m) => (
                   <tr
                     key={`materi-${m.id}`}
                     draggable

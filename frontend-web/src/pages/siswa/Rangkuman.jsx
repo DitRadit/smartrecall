@@ -68,7 +68,7 @@ export default function Rangkuman() {
       {isOffline && <OfflineBanner>Sedang offline</OfflineBanner>}
 
       <header className="flex items-center gap-3 px-container-padding h-touch-target-min border-b border-outline-variant bg-surface">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-primary text-label-md">
+        <button onClick={() => navigate('/siswa/materi')} className="flex items-center gap-1 text-primary text-label-md">
           <span className="material-symbols-outlined">arrow_back</span>
           Kembali
         </button>

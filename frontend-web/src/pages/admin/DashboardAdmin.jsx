@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../services/authContext';
+import { formatDateTime } from '../../utils/formatDate';
 import api from '../../services/api';
 
 export default function DashboardAdmin() {
@@ -82,10 +83,9 @@ export default function DashboardAdmin() {
             <table className="w-full text-left">
               <thead className="bg-surface-container-low border-b border-outline-variant">
                 <tr>
-                  <th className="px-6 py-4 text-label-md text-on-surface-variant">Waktu</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Pengguna</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Aksi</th>
-                  <th className="px-6 py-4 text-label-md text-on-surface-variant">Deskripsi</th>
+                  <th className="px-6 py-4 text-label-md text-on-surface-variant">Waktu</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
@@ -93,7 +93,6 @@ export default function DashboardAdmin() {
                   const isOnline = onlineUsers.some(ou => ou.userId === act.userId);
                   return (
                     <tr key={act.id} className="hover:bg-surface-container-low transition-colors">
-                      <td className="px-6 py-4 text-body-sm text-on-surface-variant">{new Date(act.createdAt).toLocaleString('id-ID')}</td>
                       <td className="px-6 py-4 font-semibold text-body-md">
                         <div className="flex items-center gap-2">
                           <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-outline-variant'}`} title={isOnline ? 'Online' : 'Offline'}></span>
@@ -101,8 +100,24 @@ export default function DashboardAdmin() {
                           <span className="text-label-sm font-normal px-2 bg-surface-container rounded-full">{act.user?.role}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-body-md font-medium text-primary">{act.action}</td>
-                      <td className="px-6 py-4 text-body-md text-on-surface-variant">{act.description}</td>
+                      <td className="px-6 py-4">
+                        {act.action === 'LOGIN' || act.action === 'LOGOUT' ? (
+                          isOnline ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label-sm bg-green-100 text-green-700 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                              Online
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-label-sm bg-surface-container text-on-surface-variant font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+                              Offline
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-body-md font-medium text-primary">{act.action}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-body-sm text-on-surface-variant">{formatDateTime(act.createdAt)}</td>
                     </tr>
                   );
                 })}

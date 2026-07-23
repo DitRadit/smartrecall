@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
+import { formatDateTime } from '../../utils/formatDate';
 
 export default function StatistikSiswa() {
   const { id } = useParams();
@@ -51,7 +52,7 @@ export default function StatistikSiswa() {
           <span className="material-symbols-outlined">{!lastSync ? 'cloud_off' : isOldSync ? 'cloud_off' : 'cloud_done'}</span>
           <div className="flex flex-col">
             <span className="text-label-sm font-bold uppercase tracking-wider">Status Sinkronisasi</span>
-            <span className="text-label-md">{lastSync ? lastSync.toLocaleString('id-ID') : 'Belum pernah Sync'}</span>
+            <span className="text-label-md">{lastSync ? formatDateTime(lastSync) : 'Belum pernah Sync'}</span>
           </div>
         </div>
       </header>
@@ -151,7 +152,7 @@ export default function StatistikSiswa() {
                     <div key={k.id} className="p-3 border border-outline-variant rounded-lg flex justify-between items-center hover:bg-surface-container-low transition-colors">
                       <div>
                         <p className="font-semibold text-body-md text-on-surface line-clamp-1">{k.materi?.judul}</p>
-                        <p className="text-label-sm text-on-surface-variant mt-1">{new Date(k.submittedAt).toLocaleString('id-ID')}</p>
+                        <p className="text-label-sm text-on-surface-variant mt-1">{formatDateTime(k.submittedAt)}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className={`text-title-md font-bold ${score < 60 ? 'text-error' : 'text-primary'}`}>{score.toFixed(0)}%</p>

@@ -18,8 +18,21 @@ export default function Layout({ children }) {
     if (typeof window === 'undefined') return false;
     return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
   });
-  const homePath = user?.role === 'guru' ? '/guru/dashboard' : '/siswa/materi';
-  const showBackButton = Boolean(user && location.pathname !== homePath);
+
+  const topLevelPaths = [
+    '/admin/dashboard', '/admin/pengguna', '/admin/kelas',
+    '/guru/dashboard', '/guru/statistik',
+    '/siswa/materi'
+  ];
+  
+  let homePath = '/';
+  if (user) {
+    if (user.role === 'admin') homePath = '/admin/dashboard';
+    else if (user.role === 'guru') homePath = '/guru/dashboard';
+    else homePath = '/siswa/materi';
+  }
+  
+  const showBackButton = Boolean(user && !topLevelPaths.includes(location.pathname));
   const showLogout = Boolean(user && !isOffline && !isPwaMode);
 
   useEffect(() => {
