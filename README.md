@@ -227,6 +227,7 @@ python app.py
 cd backend-api
 npx prisma migrate dev --name init
 npx prisma generate
+npm run seed
 npm run dev
 
 # Terminal 3: Frontend Web (port 5173)
@@ -416,8 +417,10 @@ python app.py
 cd backend-api
 npm install
 cp .env.example .env
-npx prisma migrate dev
-npm start
+npx prisma migrate dev --name init
+npx prisma generate
+npm run seed
+npm run dev
 ```
 
 **3. Frontend Web (React)**
@@ -425,7 +428,7 @@ npm start
 cd frontend-web
 npm install
 cp .env.example .env
-npm run dev
+npm run dev -- --host
 ```
 
 ### Struktur Project
@@ -559,11 +562,14 @@ python app.py
 
 # Terminal 2: Backend API (port 3000)
 cd backend-api
-npm start
+npx prisma migrate dev --name init
+npx prisma generate
+npm run seed
+npm run dev
 
 # Terminal 3: Frontend Web (port 5173)
 cd frontend-web
-npm run dev
+npm run dev -- --host
 ```
 
 Lalu buka: http://localhost:5173
@@ -758,3 +764,4 @@ This project includes automated installation scripts:
 **Happy Learning**
 
 For more information, visit the [docs](docs/) folder.
+

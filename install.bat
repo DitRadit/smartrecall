@@ -106,6 +106,35 @@ if exist backend-api (
         exit /b 1
     )
     echo [OK] Backend API installed successfully
+
+    echo Generating Prisma Client...
+    call npx prisma generate
+    if errorlevel 1 (
+        echo [ERROR] Failed to generate Prisma Client
+        cd ..
+        pause
+        exit /b 1
+    )
+    echo [OK] Prisma Client generated
+
+    echo Running database migration...
+    call npx prisma migrate dev --name init
+    if errorlevel 1 (
+        echo [ERROR] Failed to run Prisma migration
+        cd ..
+        pause
+        exit /b 1
+    )
+    echo [OK] Database migrated
+
+    echo Seeding database...
+    call npm run seed
+    if errorlevel 1 (
+        echo [WARNING] Seeding failed or no seed script found, skipping
+    ) else (
+        echo [OK] Database seeded
+    )
+
     cd ..
 ) else (
     echo [ERROR] backend-api folder not found
