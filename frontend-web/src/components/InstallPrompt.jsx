@@ -46,21 +46,14 @@ export default function InstallPrompt() {
   // Sudah terinstall (berjalan sebagai app standalone) -> tidak perlu tampilkan apa pun.
   if (isStandalone) return null;
 
-  // Jika bukan iOS, paksa tampilkan tombol (meskipun deferredPrompt belum ada).
-  // Jika deferredPrompt null saat diklik, kita beri tahu alasannya lewat alert.
-  if (!isIOS) {
+  // Android/Desktop: browser sudah siap kasih prompt asli.
+  if (deferredPrompt) {
     return (
       <div className="flex flex-wrap items-center gap-3 bg-secondary-container text-on-secondary-container px-4 py-2 text-label-md font-label-md">
         <span className="material-symbols-outlined">install_mobile</span>
         <span className="flex-1">Install SmartRecall ke perangkat ini supaya lebih cepat dibuka & bisa dipakai offline.</span>
         <button
-          onClick={() => {
-            if (deferredPrompt) {
-              handleInstallClick();
-            } else {
-              alert('Opsi install otomatis diblokir oleh browser karena koneksi bukan HTTPS/localhost. Sebagai alternatif, ketuk ikon "titik tiga" di pojok kanan atas browser Anda, lalu pilih "Tambahkan ke Layar Utama" (Add to Home Screen).');
-            }
-          }}
+          onClick={handleInstallClick}
           className="h-9 px-4 rounded-full bg-primary text-on-primary text-label-sm font-label-sm whitespace-nowrap"
         >
           Install App
@@ -96,5 +89,7 @@ export default function InstallPrompt() {
     );
   }
 
+  // Browser lain yang belum memicu beforeinstallprompt (mis. sudah pernah
+  // di-dismiss, atau kriteria installable belum lengkap) -> tidak tampilkan apa pun.
   return null;
 }
