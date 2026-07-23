@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import api from '../../services/api';
 import AiProgressBar from '../../components/AiProgressBar';
@@ -24,6 +24,7 @@ export default function UploadMateri() {
   const [loading, setLoading] = useState(false);
   const [aiProgress, setAiProgress] = useState(null);
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const groupId = searchParams.get('groupId');
 
@@ -68,7 +69,12 @@ export default function UploadMateri() {
               htmlContainer: 'text-body-md text-on-surface-variant'
             }
           }).then(() => {
-            navigate('/guru/dashboard', { state: { returnGroupId: groupId ? Number(groupId) : null } });
+            navigate('/guru/dashboard', { 
+              state: { 
+                returnGroupId: groupId ? Number(groupId) : null,
+                breadcrumb: location.state?.breadcrumb 
+              } 
+            });
           });
           return;
         }

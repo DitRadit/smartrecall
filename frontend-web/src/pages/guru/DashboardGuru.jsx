@@ -169,7 +169,12 @@ export default function DashboardGuru() {
 
   function handleNavigateFolder(group) {
     setCurrentParentId(group.id);
-    setBreadcrumb((prev) => [...prev, { id: group.id, nama: group.nama }]);
+    setBreadcrumb((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].id === group.id) {
+        return prev;
+      }
+      return [...prev, { id: group.id, nama: group.nama }];
+    });
   }
 
   function handleBreadcrumbClick(index) {
@@ -600,6 +605,7 @@ export default function DashboardGuru() {
           </button>
           <Link
             to={currentParentId ? `/guru/upload?groupId=${currentParentId}` : `/guru/upload`}
+            state={{ breadcrumb }}
             className="bg-primary text-on-primary h-touch-target-min px-6 rounded-xl flex items-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
           >
             <span className="material-symbols-outlined">upload_file</span>
