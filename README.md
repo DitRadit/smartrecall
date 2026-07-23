@@ -158,6 +158,7 @@ Setelah `npm run seed`:
 
 | Peran | Username | Password |
 | --- | --- | --- |
+| Admin | `admin_demo` | `admin123` |
 | Guru | `guru_demo` | `guru123` |
 | Siswa | `siswa_demo` | `siswa123` |
 
@@ -254,6 +255,13 @@ python -m pytest tests
 Database SQLite tetap menjadi source of truth. Jangan menggunakan IndexedDB sebagai penyimpanan progres permanen.
 
 ## Alur penggunaan
+
+### Admin
+
+1. Login sebagai admin.
+2. Kelola daftar kelas dan akun pengguna (guru/siswa).
+3. Pantau status online secara *real-time* via dashboard.
+4. Lacak metrik sistem, statistik materi dari berbagai guru, serta ringkasan aktivitas harian.
 
 ### Guru
 
