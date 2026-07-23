@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/authContext';
+import Swal from 'sweetalert2';
 
 /**
  * Profil.jsx - Halaman profil sederhana, dirujuk oleh BottomNav.jsx.
@@ -11,8 +12,20 @@ export default function Profil() {
   const navigate = useNavigate();
 
   function handleLogout() {
-    logout();
-    navigate('/login');
+    Swal.fire({
+      title: 'Yakin ingin keluar?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Ya, Keluar',
+      cancelButtonText: 'Batal'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        logout();
+        navigate('/login');
+      }
+    });
   }
 
   if (!user) return null;

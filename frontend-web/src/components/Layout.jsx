@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../services/authContext';
 import InstallPrompt from './InstallPrompt';
 import BottomNav from './BottomNav';
+import Swal from 'sweetalert2';
 
 /**
  * Layout.jsx - Top bar + navigasi, mengikuti pola desain Stitch:
@@ -62,8 +63,20 @@ export default function Layout({ children }) {
   }, []);
 
   function handleLogout() {
-    logout();
-    navigate('/login');
+    Swal.fire({
+      title: 'Yakin ingin keluar?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Ya, Keluar',
+      cancelButtonText: 'Batal'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        logout();
+        navigate('/login');
+      }
+    });
   }
 
   function handleBack() {

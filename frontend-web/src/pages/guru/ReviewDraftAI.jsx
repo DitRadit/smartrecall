@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 import RangkumanBlocks from '../../components/RangkumanBlocks';
 import AiProgressBar from '../../components/AiProgressBar';
+import Swal from 'sweetalert2';
 
 /**
  * ReviewDraftAI.jsx - Guru mereview, mengedit, approve/reject draft AI (FR-6).
@@ -33,6 +34,9 @@ export default function ReviewDraftAI() {
   const [error, setError] = useState('');
   const [manualPertanyaan, setManualPertanyaan] = useState('');
   const [manualJawaban, setManualJawaban] = useState('');
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // --- Flashcard edit state ---
   const [editingFlashcardId, setEditingFlashcardId] = useState(null);
@@ -69,7 +73,18 @@ export default function ReviewDraftAI() {
   async function handleApprove(action) {
     try {
       await api.post(`/materi/${id}/approve`, { action });
-      await loadDraft();
+      if (action === 'publish') {
+        Swal.fire({
+          icon: 'success',
+          title: 'Berhasil mempublish materi!',
+          showConfirmButton: false,
+          timer: 1000
+        }).then(() => {
+          navigate('/guru/dashboard', { state: location.state });
+        });
+      } else {
+        await loadDraft();
+      }
     } catch (err) {
       setError(err.response?.data?.message || `Gagal ${action} materi.`);
     }
