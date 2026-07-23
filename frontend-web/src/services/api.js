@@ -35,6 +35,9 @@ const BACKEND_API_URL = resolveBackendApiUrl();
 const api = axios.create({
   baseURL: BACKEND_API_URL,
   timeout: 10000,
+  headers: {
+    'ngrok-skip-browser-warning': 'true',
+  },
 });
 
 api.interceptors.request.use((config) => {
