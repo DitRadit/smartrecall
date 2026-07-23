@@ -521,8 +521,8 @@ async function approveMateri(req, res) {
       return res.status(404).json({ error: 'not_found', message: 'Materi tidak ditemukan' });
     }
 
-    if (!['approve', 'reject'].includes(action)) {
-      return res.status(400).json({ error: 'bad_request', message: "action harus 'approve' atau 'reject'" });
+    if (!['approve', 'reject', 'unpublish'].includes(action)) {
+      return res.status(400).json({ error: 'bad_request', message: "action harus 'approve', 'reject', atau 'unpublish'" });
     }
 
     // Terapkan edit guru (jika ada) sebelum approve.
@@ -539,6 +539,13 @@ async function approveMateri(req, res) {
         prisma.bankSoal.updateMany({ where: { materiId }, data: { status: 'approved' } }),
         prisma.rangkuman.updateMany({ where: { materiId }, data: { status: 'approved' } }),
         prisma.materi.update({ where: { id: materiId }, data: { status: 'published' } }),
+      ]);
+    } else if (action === 'unpublish') {
+      await prisma.$transaction([
+        prisma.flashcard.updateMany({ where: { materiId }, data: { status: 'draft' } }),
+        prisma.bankSoal.updateMany({ where: { materiId }, data: { status: 'draft' } }),
+        prisma.rangkuman.updateMany({ where: { materiId }, data: { status: 'draft' } }),
+        prisma.materi.update({ where: { id: materiId }, data: { status: 'draft' } }),
       ]);
     } else {
       await prisma.$transaction([

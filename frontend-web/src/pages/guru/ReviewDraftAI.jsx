@@ -73,10 +73,10 @@ export default function ReviewDraftAI() {
   async function handleApprove(action) {
     try {
       await api.post(`/materi/${id}/approve`, { action });
-      if (action === 'publish') {
+      if (action === 'approve' || action === 'unpublish') {
         Swal.fire({
           icon: 'success',
-          title: 'Berhasil mempublish materi!',
+          title: action === 'approve' ? 'Berhasil mempublish materi!' : 'Berhasil meng-unpublish materi!',
           showConfirmButton: false,
           timer: 1000,
           customClass: {
@@ -899,11 +899,11 @@ export default function ReviewDraftAI() {
               Approve Semua & Publish
             </button>
             <button
-              onClick={() => handleApprove('reject')}
+              onClick={() => handleApprove(materi.status === 'published' ? 'unpublish' : 'reject')}
               className="h-touch-target-min border border-outline-variant text-on-surface-variant rounded-xl text-label-md flex items-center justify-center gap-2"
             >
-              <span className="material-symbols-outlined">delete</span>
-              Reject Draft
+              <span className="material-symbols-outlined">{materi.status === 'published' ? 'visibility_off' : 'delete'}</span>
+              {materi.status === 'published' ? 'Unpublish' : 'Reject Draft'}
             </button>
           </div>
         </aside>
