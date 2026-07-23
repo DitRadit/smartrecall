@@ -82,6 +82,7 @@ npm install
 cp .env.example .env
 nnpx prisma migrate dev --name init
 npx prisma generate
+npm run seed
 npm run dev
 ```
 
