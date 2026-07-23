@@ -92,9 +92,10 @@ export default function ManajemenKelas() {
       </form>
 
       <div className="border border-outline-variant rounded-xl overflow-hidden bg-surface-container-lowest">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-surface-container-low border-b border-outline-variant">
-            <tr>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[400px]">
+            <thead className="bg-surface-container-low border-b border-outline-variant">
+              <tr>
               <th className="px-6 py-4 text-label-md text-on-surface-variant">Nama Kelas</th>
               <th className="px-6 py-4 text-label-md text-on-surface-variant text-right">Aksi</th>
             </tr>
@@ -127,6 +128,7 @@ export default function ManajemenKelas() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

@@ -80,9 +80,10 @@ export default function DashboardAdmin() {
         <div className="lg:col-span-2">
           <h3 className="text-title-lg text-on-surface mb-4">Aktivitas Terbaru</h3>
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-surface-container-low border-b border-outline-variant">
-                <tr>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[600px]">
+                <thead className="bg-surface-container-low border-b border-outline-variant">
+                  <tr>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Pengguna</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Aksi</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Waktu</th>
@@ -123,13 +124,15 @@ export default function DashboardAdmin() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
           <h3 className="text-title-lg text-on-surface mb-4 mt-8">Laporan Guru (Total Materi)</h3>
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-surface-container-low border-b border-outline-variant">
-                <tr>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[600px]">
+                <thead className="bg-surface-container-low border-b border-outline-variant">
+                  <tr>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Nama Guru</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Status</th>
                   <th className="px-6 py-4 text-label-md text-on-surface-variant">Total Materi Diunggah</th>
@@ -153,6 +156,7 @@ export default function DashboardAdmin() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
 

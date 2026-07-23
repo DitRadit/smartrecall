@@ -223,9 +223,10 @@ export default function StatistikKelas() {
         </div>
       </div>
       <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-surface-container-low border-b border-outline-variant">
-            <tr>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[600px]">
+            <thead className="bg-surface-container-low border-b border-outline-variant">
+              <tr>
               <th className="px-6 py-4 text-label-md text-on-surface-variant">Nama Siswa</th>
               <th className="px-6 py-4 text-label-md text-on-surface-variant">Tindak Lanjut / Status</th>
               <th className="px-6 py-4 text-label-md text-on-surface-variant">Status Sinkronisasi Terakhir</th>
@@ -291,6 +292,7 @@ export default function StatistikKelas() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

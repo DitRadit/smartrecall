@@ -6,16 +6,19 @@ Platform microlearning berbasis AI dan spaced repetition untuk membantu sekolah 
 
 ## Fitur utama
 
-- Autentikasi dan pembatasan akses untuk guru serta siswa.
+- Autentikasi dan pembatasan akses untuk admin, guru serta siswa.
 - Upload PDF dengan validasi tipe dan ukuran file.
 - Ekstraksi PDF dan pembuatan draft konten melalui NVIDIA NIM.
 - Human-in-the-loop: hasil AI harus ditinjau guru sebelum dipublikasikan.
 - Editor rangkuman, flashcard, dan bank soal.
+- **Manajemen Materi Lanjutan (Folder/Grouping)**: Mengorganisir materi guru di dalam struktur folder secara terpusat.
 - Input flashcard manual saat AI atau internet tidak tersedia.
-- Materi published-only untuk siswa.
+- Materi published-only dan dukungan **Sesi Kelas Terpandu** untuk pengaturan akses aktif di lokal.
 - Review flashcard dengan algoritma SM-2.
 - Kuis dengan penilaian di server dan riwayat pengerjaan.
-- PWA dengan app-shell cache, cache materi, IndexedDB, offline queue, dan sinkronisasi ulang.
+- **Admin & Guru Dashboard Interaktif**: Laporan aktivitas belajar siswa, real-time status online dengan Socket.io, beserta statistik skor kualitas dan analisis partisipasi kelas.
+- PWA dengan app-shell cache, cache materi, IndexedDB, offline queue, dan sinkronisasi ulang yang lebih tangguh (termasuk *offline folder visibility*).
+- **Desain Responsif & Mobile-Friendly**: Termasuk layout tabel dan komponen utama yang dioptimalkan untuk berbagai layar (scrollable tables).
 - SQLite sebagai sumber data utama agar mudah dijalankan pada satu laptop sekolah.
 
 ## Arsitektur
@@ -36,7 +39,7 @@ Frontend hanya berkomunikasi dengan backend. `ai-service` adalah satu-satunya ko
 | Bagian | Teknologi |
 | --- | --- |
 | Frontend | React 18, Vite, Tailwind CSS, PWA, IndexedDB |
-| Backend | Node.js 20, Express, Prisma, SQLite, JWT |
+| Backend | Node.js 20, Express, Prisma, SQLite, JWT, Socket.io |
 | AI service | Python 3.11, Flask, pdfplumber, Sastrawi, requests |
 | AI provider | NVIDIA NIM (`meta/llama-3.1-8b-instruct`) |
 | Testing | Jest, Vitest, Testing Library, Pytest |
