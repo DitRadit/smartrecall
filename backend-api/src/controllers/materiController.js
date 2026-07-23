@@ -548,11 +548,7 @@ async function approveMateri(req, res) {
         prisma.materi.update({ where: { id: materiId }, data: { status: 'draft' } }),
       ]);
     } else {
-      await prisma.$transaction([
-        prisma.flashcard.deleteMany({ where: { materiId, status: 'draft' } }),
-        prisma.bankSoal.deleteMany({ where: { materiId, status: 'draft' } }),
-        prisma.rangkuman.deleteMany({ where: { materiId, status: 'draft' } }),
-      ]);
+      await prisma.materi.delete({ where: { id: materiId } });
     }
 
     return res.status(200).json({ message: `Materi berhasil di-${action}` });

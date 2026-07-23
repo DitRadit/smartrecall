@@ -73,10 +73,15 @@ export default function ReviewDraftAI() {
   async function handleApprove(action) {
     try {
       await api.post(`/materi/${id}/approve`, { action });
-      if (action === 'approve' || action === 'unpublish') {
+      if (action === 'approve' || action === 'unpublish' || action === 'reject') {
+        const titleMap = {
+          approve: 'Berhasil mempublish materi!',
+          unpublish: 'Berhasil meng-unpublish materi!',
+          reject: 'Draft berhasil dihapus!'
+        };
         Swal.fire({
           icon: 'success',
-          title: action === 'approve' ? 'Berhasil mempublish materi!' : 'Berhasil meng-unpublish materi!',
+          title: titleMap[action],
           showConfirmButton: false,
           timer: 1000,
           customClass: {
@@ -900,10 +905,14 @@ export default function ReviewDraftAI() {
             </button>
             <button
               onClick={() => handleApprove(materi.status === 'published' ? 'unpublish' : 'reject')}
-              className="h-touch-target-min border border-outline-variant text-on-surface-variant rounded-xl text-label-md flex items-center justify-center gap-2"
+              className={`h-touch-target-min rounded-xl text-label-md flex items-center justify-center gap-2 ${
+                materi.status === 'published' 
+                  ? 'border border-outline-variant text-on-surface-variant hover:bg-surface-container' 
+                  : 'bg-error text-on-error hover:opacity-90'
+              }`}
             >
               <span className="material-symbols-outlined">{materi.status === 'published' ? 'visibility_off' : 'delete'}</span>
-              {materi.status === 'published' ? 'Unpublish' : 'Reject Draft'}
+              {materi.status === 'published' ? 'Unpublish' : 'Hapus Draft'}
             </button>
           </div>
         </aside>
