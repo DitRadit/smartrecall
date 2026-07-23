@@ -194,6 +194,15 @@ async function submitQuiz(req, res) {
       },
     });
 
+    // Logging Activity
+    await prisma.activityLog.create({
+      data: {
+        userId: siswaId,
+        action: 'KERJAKAN_KUIS',
+        description: `Siswa ${req.user.nama || ''} mengerjakan kuis (Skor: ${skorBenar}/${soalList.length})`,
+      },
+    });
+
     await prisma.user.update({
       where: { id: siswaId },
       data: { lastSyncAt: new Date() },

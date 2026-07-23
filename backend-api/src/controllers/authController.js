@@ -99,7 +99,7 @@ async function getMe(req, res) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, nama: true, role: true, username: true, nis: true, kelasId: true, activeGroupId: true },
+      select: { id: true, nama: true, role: true, username: true, nis: true, kelasId: true, activeGroupId: true, activeKelasId: true },
     });
     if (!user) {
       return res.status(404).json({ error: 'not_found', message: 'User tidak ditemukan' });
@@ -113,18 +113,25 @@ async function getMe(req, res) {
 
 /**
  * PUT /auth/active-group
- * Guru set atau clear folder sesi aktif. Body: { groupId: number | null }
+ * Guru set atau clear folder sesi aktif. Body: { groupId: number | null, kelasId: number | null }
  * Jika groupId null → sesi diakhiri, siswa tidak bisa lihat apapun.
  */
 async function setActiveGroup(req, res) {
   try {
-    const { groupId } = req.body;
+    const { groupId, kelasId } = req.body;
     const parsedGroupId = groupId === undefined || groupId === null || groupId === ''
       ? null
       : parseInt(groupId, 10);
+      
+    const parsedKelasId = kelasId === undefined || kelasId === null || kelasId === ''
+      ? null
+      : parseInt(kelasId, 10);
 
     if (parsedGroupId !== null && Number.isNaN(parsedGroupId)) {
       return res.status(400).json({ error: 'bad_request', message: 'groupId tidak valid' });
+    }
+    if (parsedKelasId !== null && Number.isNaN(parsedKelasId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'kelasId tidak valid' });
     }
 
     // Pastikan folder milik guru ini (jika bukan null)
@@ -137,15 +144,27 @@ async function setActiveGroup(req, res) {
         return res.status(404).json({ error: 'not_found', message: 'Folder tidak ditemukan atau bukan milik Anda' });
       }
     }
+    
+    // Pastikan kelas valid (jika bukan null)
+    if (parsedKelasId !== null) {
+      const kelasExist = await prisma.kelas.findUnique({
+        where: { id: parsedKelasId },
+        select: { id: true },
+      });
+      if (!kelasExist) {
+        return res.status(404).json({ error: 'not_found', message: 'Kelas tidak ditemukan' });
+      }
+    }
 
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { activeGroupId: parsedGroupId },
+      data: { activeGroupId: parsedGroupId, activeKelasId: parsedKelasId },
     });
 
     return res.status(200).json({
       message: parsedGroupId ? 'Sesi kelas dimulai' : 'Sesi kelas diakhiri',
       activeGroupId: parsedGroupId,
+      activeKelasId: parsedKelasId,
     });
   } catch (err) {
     console.error('setActiveGroup error:', err);
@@ -175,6 +194,23 @@ async function login(req, res) {
     }
 
     const token = signToken(user);
+
+    // Log login activity (keep only the latest by deleting old ones)
+    try {
+      await prisma.activityLog.deleteMany({
+        where: { userId: user.id, action: 'LOGIN' },
+      });
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          action: 'LOGIN',
+          description: `${user.nama} berhasil login`,
+        },
+      });
+    } catch (e) {
+      console.error('Failed to log login:', e);
+    }
+
     return res.status(200).json({
       token,
       user: { id: user.id, nama: user.nama, role: user.role, username: user.username, nis: user.nis },

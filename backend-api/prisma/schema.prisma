@@ -32,8 +32,12 @@ model User {
   username     String   @unique
   passwordHash String   @map("password_hash")
   nis          String?  @unique // opsional, identifier administratif tambahan untuk siswa
-  kelasId      String?  @map("kelas_id")
+  kelasId      Int?     @map("kelas_id")
+  kelas        Kelas?   @relation("UserKelas", fields: [kelasId], references: [id], onDelete: SetNull)
   activeGroupId Int?     @map("active_group_id")
+  activeGroup   Group?   @relation("ActiveGroup", fields: [activeGroupId], references: [id], onDelete: SetNull)
+  activeKelasId Int?     @map("active_kelas_id")
+  activeKelas   Kelas?   @relation("ActiveKelas", fields: [activeKelasId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now()) @map("created_at")
   lastSyncAt   DateTime? @map("last_sync_at")
 
@@ -48,13 +52,16 @@ model User {
   quizAttempts   QuizAttempt[]
   materiAccess   MateriAccess[]
 
+  // Relasi: aktivitas umum untuk Constraint 1
+  activityLogs   ActivityLog[]
+
   @@map("users")
 }
 
 model Materi {
   id           Int          @id @default(autoincrement())
   guruId       Int          @map("guru_id")
-  guru         User         @relation("GuruMateri", fields: [guruId], references: [id])
+  guru         User         @relation("GuruMateri", fields: [guruId], references: [id], onDelete: Cascade)
   groupId      Int?         @map("group_id")
   group        Group?       @relation("GroupMateri", fields: [groupId], references: [id], onDelete: Cascade)
   judul        String
@@ -103,7 +110,7 @@ model BankSoal {
 model ReviewProgress {
   id                Int      @id @default(autoincrement())
   siswaId           Int      @map("siswa_id")
-  siswa             User     @relation(fields: [siswaId], references: [id])
+  siswa             User     @relation(fields: [siswaId], references: [id], onDelete: Cascade)
   flashcardId       Int      @map("flashcard_id")
   flashcard         Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
   repetitionNumber  Int      @default(0) @map("repetition_number")
@@ -123,7 +130,7 @@ model ReviewProgress {
 model ReviewLog {
   id           Int      @id @default(autoincrement())
   siswaId      Int      @map("siswa_id")
-  siswa        User     @relation(fields: [siswaId], references: [id])
+  siswa        User     @relation(fields: [siswaId], references: [id], onDelete: Cascade)
   flashcardId  Int      @map("flashcard_id")
   flashcard    Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
   skorKualitas Int      @map("skor_kualitas") // skor 0-5 sesuai algoritma SM-2
@@ -152,7 +159,7 @@ model RangkumanRead {
   rangkumanId Int       @map("rangkuman_id")
   rangkuman   Rangkuman @relation(fields: [rangkumanId], references: [id], onDelete: Cascade)
   siswaId     Int       @map("siswa_id")
-  siswa       User      @relation(fields: [siswaId], references: [id])
+  siswa       User      @relation(fields: [siswaId], references: [id], onDelete: Cascade)
   readAt      DateTime  @default(now()) @map("read_at")
 
   @@unique([rangkumanId, siswaId])
@@ -162,7 +169,7 @@ model RangkumanRead {
 model QuizAttempt {
   id           Int      @id @default(autoincrement())
   siswaId      Int      @map("siswa_id")
-  siswa        User     @relation(fields: [siswaId], references: [id])
+  siswa        User     @relation(fields: [siswaId], references: [id], onDelete: Cascade)
   materiId     Int      @map("materi_id")
   materi       Materi   @relation(fields: [materiId], references: [id], onDelete: Cascade)
   skorBenar    Int      @map("skor_benar")
@@ -183,7 +190,7 @@ model QuizAttempt {
 model MateriAccess {
   id         Int      @id @default(autoincrement())
   siswaId    Int      @map("siswa_id")
-  siswa      User     @relation(fields: [siswaId], references: [id])
+  siswa      User     @relation(fields: [siswaId], references: [id], onDelete: Cascade)
   materiId   Int      @map("materi_id")
   materi     Materi   @relation(fields: [materiId], references: [id], onDelete: Cascade)
   grantedAt  DateTime @default(now()) @map("granted_at")
@@ -195,13 +202,35 @@ model MateriAccess {
 model Group {
   id        Int      @id @default(autoincrement())
   guruId    Int      @map("guru_id")
-  guru      User     @relation("GuruGroups", fields: [guruId], references: [id])
+  guru      User     @relation("GuruGroups", fields: [guruId], references: [id], onDelete: Cascade)
   nama      String
   parentId  Int?     @map("parent_id")
   parent    Group?   @relation("GroupToGroup", fields: [parentId], references: [id], onDelete: Cascade)
   children  Group[]  @relation("GroupToGroup")
   materi    Materi[] @relation("GroupMateri")
+  activeSessions User[] @relation("ActiveGroup")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("groups")
+}
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action      String   // misal: "LOGIN", "GENERATE_MATERI", "KERJAKAN_KUIS"
+  description String?  // misal: "Siswa Budi mengerjakan kuis Biologi"
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("activity_logs")
+}
+
+model Kelas {
+  id        Int      @id @default(autoincrement())
+  nama      String   @unique
+  users     User[]   @relation("UserKelas")
+  activeSessions User[] @relation("ActiveKelas")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("kelas")
 }

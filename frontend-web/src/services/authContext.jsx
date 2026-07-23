@@ -5,6 +5,7 @@
  */
 
 import { createContext, useContext, useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import api from './api';
 
 const AuthContext = createContext(null);
@@ -18,11 +19,24 @@ export function AuthProvider({ children }) {
     return stored ? JSON.parse(stored) : null;
   });
 
+  const [socket, setSocket] = useState(null);
+
   useEffect(() => {
     if (user) {
       localStorage.setItem(USER_KEY, JSON.stringify(user));
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token && !socket) {
+        const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+          auth: { token }
+        });
+        setSocket(newSocket);
+      }
     } else {
       localStorage.removeItem(USER_KEY);
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
     }
   }, [user]);
 
@@ -39,7 +53,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, socket }}>
       {children}
     </AuthContext.Provider>
   );

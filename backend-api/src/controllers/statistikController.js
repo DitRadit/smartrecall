@@ -3,8 +3,10 @@ const prisma = require('../config/db');
 async function getStatistikKelas(req, res) {
   try {
     const guruId = req.user.id;
+    const kelasId = req.query.kelasId && req.query.kelasId !== 'all' ? parseInt(req.query.kelasId, 10) : null;
+    
     // Ambil materi dari guru (kecuali folder)
-    const materiList = await prisma.materi.findMany({
+    let materiList = await prisma.materi.findMany({
       where: { guruId },
       include: {
         flashcards: true,
@@ -12,13 +14,26 @@ async function getStatistikKelas(req, res) {
       }
     });
 
+    if (kelasId) {
+      // Filter materi yang pernah diakses oleh siswa di kelas ini
+      const materiAccesses = await prisma.materiAccess.findMany({
+        where: { materi: { guruId }, siswa: { kelasId } },
+        select: { materiId: true },
+        distinct: ['materiId']
+      });
+      const allowedMateriIds = new Set(materiAccesses.map(ma => ma.materiId));
+      materiList = materiList.filter(m => allowedMateriIds.has(m.id));
+    }
+
     const progressPublikasi = {
       draft: materiList.filter(m => m.status === 'draft').length,
       published: materiList.filter(m => m.status === 'published').length,
     };
 
-    // Total seluruh siswa di sistem
-    const totalSiswa = await prisma.user.count({ where: { role: 'siswa' } });
+    // Total seluruh siswa di sistem / kelas
+    const totalSiswa = await prisma.user.count({ 
+      where: { role: 'siswa', ...(kelasId ? { kelasId } : {}) } 
+    });
 
     // Hitung metrik performa per materi
     const performaMateri = await Promise.all(materiList.map(async (m) => {
@@ -30,7 +45,10 @@ async function getStatistikKelas(req, res) {
 
       if (flashcardIds.length > 0) {
         const uniqueReviewers = await prisma.reviewProgress.findMany({
-          where: { flashcardId: { in: flashcardIds } },
+          where: { 
+            flashcardId: { in: flashcardIds },
+            ...(kelasId ? { siswa: { kelasId } } : {})
+          },
           select: { siswaId: true },
           distinct: ['siswaId']
         });
@@ -38,7 +56,10 @@ async function getStatistikKelas(req, res) {
 
         // Rata-rata skor kualitas materi ini
         const logStats = await prisma.reviewLog.aggregate({
-          where: { flashcardId: { in: flashcardIds } },
+          where: { 
+            flashcardId: { in: flashcardIds },
+            ...(kelasId ? { siswa: { kelasId } } : {})
+          },
           _avg: { skorKualitas: true }
         });
         rataRataSkorKualitas = logStats._avg.skorKualitas || 0;
@@ -46,7 +67,11 @@ async function getStatistikKelas(req, res) {
         // Flashcard tersulit (paling sering dijawab dengan skor < 3)
         const sulitStats = await prisma.reviewLog.groupBy({
           by: ['flashcardId'],
-          where: { flashcardId: { in: flashcardIds }, skorKualitas: { lt: 3 } },
+          where: { 
+            flashcardId: { in: flashcardIds }, 
+            skorKualitas: { lt: 3 },
+            ...(kelasId ? { siswa: { kelasId } } : {})
+          },
           _count: { flashcardId: true },
           orderBy: { _count: { flashcardId: 'desc' } },
           take: 1
@@ -68,7 +93,10 @@ async function getStatistikKelas(req, res) {
 
       // Kuis metrics
       const kuisAttempts = await prisma.quizAttempt.findMany({
-        where: { materiId: m.id }
+        where: { 
+          materiId: m.id,
+          ...(kelasId ? { siswa: { kelasId } } : {})
+        }
       });
       const uniqueQuizTakers = new Set(kuisAttempts.map(a => a.siswaId)).size;
       
@@ -93,21 +121,102 @@ async function getStatistikKelas(req, res) {
 
     // Ambil daftar seluruh siswa
     const daftarSiswa = await prisma.user.findMany({
-      where: { role: 'siswa' },
+      where: { 
+        role: 'siswa',
+        ...(kelasId ? { kelasId } : {})
+      },
       select: {
         id: true,
         nama: true,
         username: true,
-        lastSyncAt: true
+        lastSyncAt: true,
+        kelasId: true,
+        kelas: { select: { nama: true } }
       },
       orderBy: { nama: 'asc' }
     });
+
+    // Action Log: Identifikasi siswa tertinggal (Skor < 50 atau Ease Factor rendah)
+    const actionLog = [];
+    
+    const allKuis = await prisma.quizAttempt.findMany({
+      where: { ...(kelasId ? { siswa: { kelasId } } : {}) },
+      include: { 
+        siswa: { select: { nama: true, kelas: { select: { nama: true } }, kelasId: true } }, 
+        materi: { select: { judul: true } } 
+      },
+      orderBy: { submittedAt: 'desc' }
+    });
+    
+    const processedStudents = new Set();
+    
+    allKuis.forEach(k => {
+      const percentage = (k.skorBenar / k.totalSoal) * 100;
+      if (percentage < 50 && !processedStudents.has(k.siswaId)) {
+        processedStudents.add(k.siswaId);
+        actionLog.push({
+          id: `kuis-${k.id}`,
+          namaItem: k.siswa.nama,
+          kelasNama: k.siswa.kelas?.nama || 'Tanpa Kelas',
+          kelasId: k.siswa.kelasId,
+          kategori: `Kesulitan Belajar (${k.materi.judul})`,
+          status: 'Butuh Perhatian',
+          prioritas: 'Tinggi',
+          waktu: k.submittedAt,
+          aksi: 'Kirim Rekomendasi Review'
+        });
+      } else if (percentage >= 50 && percentage < 70 && !processedStudents.has(k.siswaId)) {
+        processedStudents.add(k.siswaId);
+        actionLog.push({
+          id: `kuis-${k.id}`,
+          namaItem: k.siswa.nama,
+          kelasNama: k.siswa.kelas?.nama || 'Tanpa Kelas',
+          kelasId: k.siswa.kelasId,
+          kategori: `Perlu Peningkatan (${k.materi.judul})`,
+          status: 'Sedang Dipantau',
+          prioritas: 'Sedang',
+          waktu: k.submittedAt,
+          aksi: 'Hubungi Siswa'
+        });
+      }
+    });
+
+    // Also check for bad SM-2 retention (easeFactor < 1.5)
+    const badRetention = await prisma.reviewProgress.findMany({
+      where: { 
+        easeFactor: { lt: 1.5 },
+        ...(kelasId ? { siswa: { kelasId } } : {})
+      },
+      include: { siswa: { select: { nama: true, kelas: { select: { nama: true } }, kelasId: true } } },
+      distinct: ['siswaId']
+    });
+
+    badRetention.forEach(r => {
+      if (!processedStudents.has(r.siswaId)) {
+        processedStudents.add(r.siswaId);
+        actionLog.push({
+          id: `retensi-${r.id}`,
+          namaItem: r.siswa.nama,
+          kelasNama: r.siswa.kelas?.nama || 'Tanpa Kelas',
+          kelasId: r.siswa.kelasId,
+          kategori: 'Retensi Memori Rendah',
+          status: 'Butuh Perhatian',
+          prioritas: 'Tinggi',
+          waktu: r.lastReviewedAt || new Date(),
+          aksi: 'Kirim Rekomendasi Review'
+        });
+      }
+    });
+
+    const daftarKelas = await prisma.kelas.findMany({ orderBy: { nama: 'asc' } });
 
     return res.status(200).json({
       progressPublikasi,
       totalSiswa,
       performaMateri,
-      daftarSiswa
+      daftarSiswa,
+      actionLog,
+      daftarKelas
     });
   } catch (err) {
     console.error('getStatistikKelas error:', err);

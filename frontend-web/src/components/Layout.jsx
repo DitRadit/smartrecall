@@ -95,31 +95,60 @@ export default function Layout({ children }) {
             </div>
           </header>
 
-          {user.role === 'guru' && (
+          {(user.role === 'guru' || user.role === 'admin') && (
             <div className="hidden md:flex">
               <aside className="w-60 shrink-0 border-r border-outline-variant min-h-[calc(100vh-64px)] p-4">
                 <nav className="flex flex-col gap-2">
-                  <Link
-                    to="/guru/dashboard"
-                    className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                  >
-                    <span className="material-symbols-outlined">menu_book</span>
-                    <span className="font-label-md text-label-md">Materi Saya</span>
-                  </Link>
-                  <Link
-                    to="/guru/upload"
-                    className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                  >
-                    <span className="material-symbols-outlined">cloud_upload</span>
-                    <span className="font-label-md text-label-md">Upload</span>
-                  </Link>
-                  <Link
-                    to="/guru/statistik"
-                    className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                  >
-                    <span className="material-symbols-outlined">insights</span>
-                    <span className="font-label-md text-label-md">Statistik Kelas</span>
-                  </Link>
+                  {user.role === 'admin' && (
+                    <>
+                      <Link
+                        to="/admin/dashboard"
+                        className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                      >
+                        <span className="material-symbols-outlined">dashboard</span>
+                        <span className="font-label-md text-label-md">Dashboard Admin</span>
+                      </Link>
+                      <Link
+                        to="/admin/pengguna"
+                        className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                      >
+                        <span className="material-symbols-outlined">manage_accounts</span>
+                        <span className="font-label-md text-label-md">Manajemen Pengguna</span>
+                      </Link>
+                      <Link
+                        to="/admin/kelas"
+                        className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                      >
+                        <span className="material-symbols-outlined">class</span>
+                        <span className="font-label-md text-label-md">Manajemen Kelas</span>
+                      </Link>
+                    </>
+                  )}
+                  {user.role === 'guru' && (
+                    <>
+                      <Link
+                        to="/guru/dashboard"
+                        className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                      >
+                        <span className="material-symbols-outlined">menu_book</span>
+                        <span className="font-label-md text-label-md">Materi Saya</span>
+                      </Link>
+                      <Link
+                        to="/guru/upload"
+                        className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                      >
+                        <span className="material-symbols-outlined">cloud_upload</span>
+                        <span className="font-label-md text-label-md">Upload</span>
+                      </Link>
+                      <Link
+                        to="/guru/statistik"
+                        className="rounded-full px-4 py-3 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                      >
+                        <span className="material-symbols-outlined">insights</span>
+                        <span className="font-label-md text-label-md">Statistik Kelas</span>
+                      </Link>
+                    </>
+                  )}
                 </nav>
               </aside>
               <main className="flex-1">{children}</main>
@@ -128,8 +157,8 @@ export default function Layout({ children }) {
         </>
       )}
 
-      {(!user || user.role !== 'guru') && <main>{children}</main>}
-      {user?.role === 'guru' && <main className="md:hidden">{children}</main>}
+      {(!user || (user.role !== 'guru' && user.role !== 'admin')) && <main>{children}</main>}
+      {(user?.role === 'guru' || user?.role === 'admin') && <main className="md:hidden">{children}</main>}
 
       {user && <BottomNav role={user.role} />}
     </div>

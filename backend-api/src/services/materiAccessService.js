@@ -23,9 +23,22 @@ const prisma = require('../config/db');
  * descendant-nya. Materi dengan groupId null (di root, tanpa folder) SENGAJA
  * tidak pernah termasuk di sini -- sama seperti perilaku sebelumnya.
  */
-async function getActiveSessionGroupIds() {
+async function getActiveSessionGroupIds(siswaId) {
+  if (!siswaId) return new Set();
+  
+  const siswa = await prisma.user.findUnique({
+    where: { id: siswaId },
+    select: { kelasId: true },
+  });
+  
+  if (!siswa || !siswa.kelasId) return new Set(); // Jika siswa tidak punya kelas, dia tidak bisa ikut sesi kelas apapun
+
   const activeGurus = await prisma.user.findMany({
-    where: { role: 'guru', activeGroupId: { not: null } },
+    where: { 
+      role: 'guru', 
+      activeGroupId: { not: null },
+      activeKelasId: siswa.kelasId 
+    },
     select: { activeGroupId: true },
   });
 
@@ -100,7 +113,7 @@ async function canStudentAccessMateri(siswaId, materiId) {
   if (!materi) return false;
 
   if (materi.groupId !== null && materi.groupId !== undefined) {
-    const activeGroupIds = await getActiveSessionGroupIds();
+    const activeGroupIds = await getActiveSessionGroupIds(siswaId);
     if (activeGroupIds.has(materi.groupId)) return true;
   }
 

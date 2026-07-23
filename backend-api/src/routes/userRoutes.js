@@ -3,8 +3,8 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-// Semua endpoint /users hanya untuk guru yang sudah login
-router.use(requireAuth, requireRole('guru'));
+// Semua endpoint /users hanya untuk admin yang sudah login
+router.use(requireAuth, requireRole('admin'));
 
 router.get('/', userController.listUsers);
 router.post('/siswa', userController.createSiswa);

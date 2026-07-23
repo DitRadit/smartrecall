@@ -16,6 +16,12 @@ const NAV_ITEMS = {
     { to: '/guru/statistik', icon: 'insights', label: 'Statistik' },
     { to: '/profil', icon: 'person', label: 'Profil' },
   ],
+  admin: [
+    { to: '/admin/dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { to: '/admin/pengguna', icon: 'manage_accounts', label: 'Pengguna' },
+    { to: '/admin/kelas', icon: 'class', label: 'Kelas' },
+    { to: '/profil', icon: 'person', label: 'Profil' },
+  ],
 };
 
 export default function BottomNav({ role }) {

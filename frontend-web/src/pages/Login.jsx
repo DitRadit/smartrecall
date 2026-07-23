@@ -21,7 +21,11 @@ export default function Login() {
     setLoading(true);
     try {
       const user = await login(username, password);
-      navigate(user.role === 'guru' ? '/guru/dashboard' : '/siswa/materi');
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate(user.role === 'guru' ? '/guru/dashboard' : '/siswa/materi');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Login gagal. Periksa username/password.');
     } finally {

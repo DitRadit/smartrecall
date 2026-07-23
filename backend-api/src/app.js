@@ -12,6 +12,8 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { initSocket } = require('./socket');
 
 const authRoutes = require('./routes/authRoutes');
 const materiRoutes = require('./routes/materiRoutes');
@@ -65,6 +67,9 @@ app.get('/health', async (req, res) => {
   });
 });
 
+const adminRoutes = require('./routes/adminRoutes');
+const kelasRoutes = require('./routes/kelasRoutes');
+
 // --- Routes sesuai kontrak API ARCHITECTURE.md bagian 3.3 ---
 app.use('/auth', authRoutes);
 app.use('/materi', materiRoutes);
@@ -75,6 +80,8 @@ app.use('/rangkuman', rangkumanRoutes);
 app.use('/groups', groupRoutes);
 app.use('/statistik', statistikRoutes);
 app.use('/users', userRoutes);
+app.use('/admin', adminRoutes);
+app.use('/kelas', kelasRoutes);
 
 // --- 404 handler ---
 app.use((req, res) => {
@@ -90,10 +97,13 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
+const server = http.createServer(app);
+initSocket(server, configuredOrigins);
+
 if (require.main === module) {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`backend-api berjalan di http://localhost:${PORT}`);
   });
 }
 
-module.exports = app;
+module.exports = { app, server };

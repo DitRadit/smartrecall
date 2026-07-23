@@ -33,6 +33,7 @@ async function listUsers(req, res) {
         username: true,
         nis: true,
         kelasId: true,
+        kelas: { select: { nama: true } },
         createdAt: true,
       },
     });
@@ -73,8 +74,13 @@ async function createSiswa(req, res) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const parsedKelasId = kelasId ? parseInt(kelasId, 10) : null;
+    if (parsedKelasId !== null && Number.isNaN(parsedKelasId)) {
+      return res.status(400).json({ error: 'bad_request', message: 'kelasId harus berupa angka' });
+    }
+
     const user = await prisma.user.create({
-      data: { nama, role: 'siswa', username, passwordHash, nis: nis || null, kelasId: kelasId || null },
+      data: { nama, role: 'siswa', username, passwordHash, nis: nis || null, kelasId: parsedKelasId },
       select: { id: true, nama: true, role: true, username: true, nis: true, kelasId: true, createdAt: true },
     });
 

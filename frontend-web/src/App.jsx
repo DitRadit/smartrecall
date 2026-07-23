@@ -9,12 +9,14 @@ import ReviewDraftAI from './pages/guru/ReviewDraftAI';
 import DashboardGuru from './pages/guru/DashboardGuru';
 import StatistikKelas from './pages/guru/StatistikKelas';
 import StatistikSiswa from './pages/guru/StatistikSiswa';
-import ManajemenPengguna from './pages/guru/ManajemenPengguna';
+import ManajemenPengguna from './pages/admin/ManajemenPengguna';
+import ManajemenKelas from './pages/admin/ManajemenKelas';
 import DaftarMateri from './pages/siswa/DaftarMateri';
 import ReviewFlashcard from './pages/siswa/ReviewFlashcard';
 import KerjakanSoal from './pages/siswa/KerjakanSoal';
 import Rangkuman from './pages/siswa/Rangkuman';
 import Profil from './pages/Profil';
+import DashboardAdmin from './pages/admin/DashboardAdmin';
 
 /**
  * App.jsx - Routing dibedakan role guru/siswa (PRD.md bagian 10, ARCHITECTURE.md).
@@ -33,6 +35,32 @@ export default function App() {
               element={
                 <PrivateRoute>
                   <Profil />
+                </PrivateRoute>
+              }
+            />
+
+            {/* Rute Admin */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <PrivateRoute role="admin">
+                  <DashboardAdmin />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/pengguna"
+              element={
+                <PrivateRoute role="admin">
+                  <ManajemenPengguna />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/kelas"
+              element={
+                <PrivateRoute role="admin">
+                  <ManajemenKelas />
                 </PrivateRoute>
               }
             />
@@ -75,14 +103,6 @@ export default function App() {
               element={
                 <PrivateRoute role="guru">
                   <StatistikSiswa />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/guru/pengguna"
-              element={
-                <PrivateRoute role="guru">
-                  <ManajemenPengguna />
                 </PrivateRoute>
               }
             />

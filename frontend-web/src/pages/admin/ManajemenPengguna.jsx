@@ -57,9 +57,13 @@ export default function ManajemenPengguna() {
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('Siswa');
   const [users, setUsers] = useState([]);
+  const [kelasList, setKelasList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterKelas, setFilterKelas] = useState('all');
 
   // Modal tambah
   const [showAddModal, setShowAddModal] = useState(false);
@@ -78,7 +82,21 @@ export default function ManajemenPengguna() {
 
   useEffect(() => {
     loadUsers();
+    setSearchQuery('');
+    setFilterKelas('all');
+    if (activeTab === 'Siswa') {
+      loadKelas();
+    }
   }, [activeTab]);
+
+  async function loadKelas() {
+    try {
+      const res = await api.get('/kelas');
+      setKelasList(res.data.kelas || []);
+    } catch (err) {
+      console.error('Gagal memuat daftar kelas', err);
+    }
+  }
 
   async function loadUsers() {
     setLoading(true);
@@ -153,6 +171,18 @@ export default function ManajemenPengguna() {
     }
   }
 
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = 
+      u.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.nis && u.nis.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+    if (activeTab === 'Siswa' && filterKelas !== 'all') {
+      return matchesSearch && u.kelasId === parseInt(filterKelas);
+    }
+    return matchesSearch;
+  });
+
   return (
     <div className="max-w-3xl mx-auto px-container-padding pt-gutter pb-8 space-y-gutter">
       <div>
@@ -191,12 +221,41 @@ export default function ManajemenPengguna() {
         ))}
       </div>
 
-      {/* Tombol tambah */}
-      <div className="flex justify-end">
+      {/* Tombol tambah & Filter */}
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+            <input 
+              type="text" 
+              placeholder="Cari nama, username..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full sm:w-[240px] bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+            />
+          </div>
+          
+          {activeTab === 'Siswa' && (
+            <div className="relative inline-flex items-center">
+              <select 
+                value={filterKelas} 
+                onChange={e => setFilterKelas(e.target.value)}
+                className="appearance-none bg-surface-container-lowest text-on-surface text-body-md pl-3 pr-9 py-2 rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none min-w-[140px] cursor-pointer"
+              >
+                <option value="all">Semua Kelas</option>
+                {kelasList.map(k => (
+                  <option key={k.id} value={k.id}>{k.nama}</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined absolute right-2 text-on-surface-variant pointer-events-none text-[20px]">expand_more</span>
+            </div>
+          )}
+        </div>
+        
         <button
           type="button"
           onClick={openAddModal}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-on-primary text-label-md font-semibold hover:bg-primary/90"
+          className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-primary text-on-primary text-label-md font-semibold hover:bg-primary/90 shrink-0"
         >
           <span className="material-symbols-outlined text-[18px]">person_add</span>
           Tambah {activeTab}
@@ -208,9 +267,11 @@ export default function ManajemenPengguna() {
         <p className="text-body-md text-on-surface-variant">Memuat...</p>
       ) : users.length === 0 ? (
         <p className="text-body-md text-on-surface-variant">Belum ada {activeTab.toLowerCase()} yang terdaftar.</p>
+      ) : filteredUsers.length === 0 ? (
+        <p className="text-body-md text-on-surface-variant">Tidak ada {activeTab.toLowerCase()} yang sesuai dengan pencarian atau filter.</p>
       ) : (
         <div className="space-y-3">
-          {users.map((u) => (
+          {filteredUsers.map((u) => (
             <div
               key={u.id}
               className="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex items-center gap-4"
@@ -222,7 +283,7 @@ export default function ManajemenPengguna() {
               </div>
               <div className="flex-grow min-w-0">
                 <p className="text-label-md font-semibold text-on-surface truncate">{u.nama}</p>
-                <p className="text-label-sm text-on-surface-variant">@{u.username}{u.nis ? ` · NIS ${u.nis}` : ''}{u.kelasId ? ` · ${u.kelasId}` : ''}</p>
+                <p className="text-label-sm text-on-surface-variant">@{u.username}{u.nis ? ` · NIS ${u.nis}` : ''}{u.kelas?.nama ? ` · Kelas ${u.kelas.nama}` : ''}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -304,13 +365,16 @@ export default function ManajemenPengguna() {
                 </div>
                 <div>
                   <label className="block text-label-md text-on-surface mb-1">Kelas <span className="text-on-surface-variant">(opsional)</span></label>
-                  <input
-                    type="text"
+                  <select
                     value={addForm.kelasId}
                     onChange={(e) => setAddForm((p) => ({ ...p, kelasId: e.target.value }))}
                     className="w-full h-10 px-3 rounded-lg border border-outline-variant bg-surface text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Contoh: kelas-10a"
-                  />
+                  >
+                    <option value="">Pilih Kelas (Tidak ada)</option>
+                    {kelasList.map(k => (
+                      <option key={k.id} value={k.id}>{k.nama}</option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}

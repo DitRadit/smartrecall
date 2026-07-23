@@ -144,7 +144,7 @@ async function getGroupContents(req, res) {
 
 async function getStudentGroupContents(req, res, parentId) {
   // 1. Kumpulkan ID folder yang termasuk tree sesi aktif (live)
-  const allowedGroupIds = await getActiveSessionGroupIds();
+  const allowedGroupIds = await getActiveSessionGroupIds(req.user.id);
   
   // 2. Kumpulkan materi ID yang punya akses permanen (MateriAccess)
   const { getAccessibleMateriIds } = require('../services/materiAccessService');

@@ -147,6 +147,15 @@ async function uploadMateri(req, res) {
       },
     });
 
+    // Logging Activity
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'GENERATE_MATERI',
+        description: `Guru ${req.user.nama || ''} mengunggah materi "${judul}"`,
+      },
+    });
+
     setGenerationProgress(materi.id, {
       status: 'queued',
       progress: 10,
@@ -385,7 +394,7 @@ async function listMateri(req, res) {
     let where;
     if (req.user.role === 'siswa') {
       const [activeGroupIds, accessibleMateriIds] = await Promise.all([
-        getActiveSessionGroupIds(),
+        getActiveSessionGroupIds(req.user.id),
         getAccessibleMateriIds(req.user.id),
       ]);
       where = {
