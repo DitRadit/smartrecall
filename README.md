@@ -1,316 +1,756 @@
 # SmartRecall
 
-Platform microlearning berbasis AI dan spaced repetition untuk membantu sekolah di wilayah 3T menyediakan pembelajaran digital melalui jaringan lokal. Guru dapat mengubah PDF menjadi draft rangkuman, flashcard, dan kuis; siswa tetap dapat belajar dari materi yang sudah tersimpan meski koneksi ke Local Server Hub terputus sementara.
+**Offline-First Spaced Repetition PWA untuk Pembelajaran Siswa & Guru Indonesia**
 
-![SmartRecall teacher dashboard](docs/design/guru_dashboard_materi/screen.png)
+SmartRecall adalah aplikasi pembelajaran berbasis teknologi AI yang dirancang untuk membantu siswa dan guru di daerah dengan konektivitas terbatas. Aplikasi ini menggunakan algoritma Spaced Repetition SM-2 untuk meningkatkan retensi materi pembelajaran.
 
-## Fitur utama
-
-- Autentikasi dan pembatasan akses untuk guru serta siswa.
-- Upload PDF dengan validasi tipe dan ukuran file.
-- Ekstraksi PDF dan pembuatan draft konten melalui NVIDIA NIM.
-- Human-in-the-loop: hasil AI harus ditinjau guru sebelum dipublikasikan.
-- Editor rangkuman, flashcard, dan bank soal.
-- Input flashcard manual saat AI atau internet tidak tersedia.
-- Materi published-only untuk siswa.
-- Review flashcard dengan algoritma SM-2.
-- Kuis dengan penilaian di server dan riwayat pengerjaan.
-- PWA dengan app-shell cache, cache materi, IndexedDB, offline queue, dan sinkronisasi ulang.
-- SQLite sebagai sumber data utama agar mudah dijalankan pada satu laptop sekolah.
-
-## Arsitektur
-
-```mermaid
-flowchart LR
-    S["Perangkat siswa/guru"] -->|LAN / hotspot| F["React PWA"]
-    F -->|REST API| B["Express API"]
-    B --> D[("SQLite")]
-    B -->|Generate materi| A["Flask AI Service"]
-    A -->|Internet hanya saat generate| N["NVIDIA NIM API"]
-```
-
-Frontend hanya berkomunikasi dengan backend. `ai-service` adalah satu-satunya komponen yang membutuhkan internet publik, dan hanya ketika guru membuat konten AI. IndexedDB digunakan sebagai cache serta antrean sementara; progres final tetap disimpan di SQLite.
-
-## Teknologi
-
-| Bagian | Teknologi |
-| --- | --- |
-| Frontend | React 18, Vite, Tailwind CSS, PWA, IndexedDB |
-| Backend | Node.js 20, Express, Prisma, SQLite, JWT |
-| AI service | Python 3.11, Flask, pdfplumber, Sastrawi, requests |
-| AI provider | NVIDIA NIM (`meta/llama-3.1-8b-instruct`) |
-| Testing | Jest, Vitest, Testing Library, Pytest |
-| Deployment | Docker Compose atau proses lokal |
-
-## Struktur proyek
-
-```text
-smartrecall/
-├── ai-service/          # Ekstraksi PDF, preprocessing, dan NVIDIA NIM
-├── backend-api/         # Gateway API, auth, database, SM-2, dan kuis
-├── frontend-web/        # React PWA untuk guru dan siswa
-├── docs/                # PRD, arsitektur, API spec, dan referensi desain
-├── docker-compose.yml
-└── README.md
-```
-
-## Prasyarat
-
-- Node.js 20 atau lebih baru
-- npm 10 atau lebih baru
-- Python 3.11 atau lebih baru
-- API key NVIDIA NIM untuk generate AI
-- Docker dan Docker Compose, opsional
-
-## Menjalankan secara lokal
-
-### 1. Clone dan siapkan environment
-
-```bash
-git clone https://github.com/USERNAME/smartrecall.git
-cd smartrecall
-
-cp ai-service/.env.example ai-service/.env
-cp backend-api/.env.example backend-api/.env
-cp frontend-web/.env.example frontend-web/.env
-```
-
-Ganti `USERNAME` dengan pemilik repository. Kemudian atur minimal:
-
-```dotenv
-# ai-service/.env
-AI_PROVIDER=nvidia
-NIM_API_KEY=your_nvidia_nim_api_key
-
-# backend-api/.env
-JWT_SECRET=ganti_dengan_random_secret_yang_panjang
-```
-
-Jangan commit file `.env` atau API key ke Git.
-
-### 2. Jalankan AI service
-
-```bash
-cd ai-service
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python app.py
-```
-
-AI service tersedia di `http://localhost:5001`.
-
-Untuk Windows PowerShell, aktifkan virtual environment dengan:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-### 3. Jalankan backend
-
-Buka terminal baru:
-
-```bash
-cd backend-api
-npm ci
-npx prisma generate
-npx prisma migrate deploy
-npm run seed
-npm run dev
-```
-
-Backend tersedia di `http://localhost:3000`.
-
-### 4. Jalankan frontend
-
-Buka terminal baru:
-
-```bash
-cd frontend-web
-npm ci
-npm run dev -- --host 0.0.0.0
-```
-
-Buka `http://localhost:5173` di browser.
-
-## Menjalankan dengan Docker Compose
-
-Salin ketiga file environment seperti langkah sebelumnya, isi `NIM_API_KEY` dan `JWT_SECRET`, lalu jalankan:
-
-```bash
-docker compose up --build
-```
-
-| Service | URL |
-| --- | --- |
-| Frontend | `http://localhost:5173` |
-| Backend API | `http://localhost:3000` |
-| AI service | `http://localhost:5001` |
-
-Hentikan service dengan `docker compose down`. Tambahkan `-v` hanya jika Anda memang ingin menghapus volume/data lokal.
-
-## Akun demo
-
-Setelah `npm run seed`:
-
-| Peran | Username | Password |
-| --- | --- | --- |
-| Guru | `guru_demo` | `guru123` |
-| Siswa | `siswa_demo` | `siswa123` |
-
-> Akun ini hanya untuk development/demo. Ganti password sebelum digunakan pada lingkungan nyata.
-
-## Variabel environment
-
-### AI service
-
-| Variabel | Keterangan | Default |
-| --- | --- | --- |
-| `AI_PROVIDER` | Provider AI aktif | `nvidia` |
-| `NIM_API_KEY` | API key NVIDIA NIM | wajib untuk generate |
-| `NIM_API_BASE_URL` | Base URL NVIDIA NIM | `https://integrate.api.nvidia.com/v1` |
-| `NIM_MODEL_NAME` | Model yang digunakan | `meta/llama-3.1-8b-instruct` |
-| `PORT` | Port AI service | `5001` |
-| `UPLOAD_FOLDER` | Folder upload sementara | `./uploads` |
-| `MAX_CONTENT_LENGTH_MB` | Batas ukuran PDF | `20` |
-| `NIM_REQUEST_TIMEOUT_SECONDS` | Timeout request NVIDIA NIM | `60` |
-| `NIM_MAX_RETRIES` | Maksimum retry NVIDIA NIM | `4` |
-| `NIM_RATE_LIMIT_SLEEP_SECONDS` | Jeda retry saat rate limit | `30` |
-| `AI_INTER_REQUEST_DELAY_SECONDS` | Jeda antar request generate berurutan | `6` |
-
-### Backend
-
-| Variabel | Keterangan | Default |
-| --- | --- | --- |
-| `PORT` | Port backend | `3000` |
-| `DATABASE_URL` | Lokasi SQLite untuk Prisma | `file:./database/dev.db` |
-| `JWT_SECRET` | Secret penandatanganan JWT | wajib diganti |
-| `JWT_EXPIRES_IN` | Masa berlaku token | `7d` |
-| `AI_SERVICE_URL` | URL internal AI service | `http://localhost:5001` |
-| `AI_SERVICE_TIMEOUT_MS` | Timeout dari backend ke AI | `65000` |
-| `FRONTEND_ORIGIN` | Origin frontend yang diizinkan | `http://localhost:5173` |
-
-### Frontend
-
-| Variabel | Keterangan | Default |
-| --- | --- | --- |
-| `VITE_BACKEND_API_URL` | URL backend yang dapat dijangkau browser | `http://localhost:3000` |
-
-Untuk perangkat lain di LAN, ubah URL frontend/backend yang relevan menjadi IP laptop server, misalnya `http://192.168.1.10:3000`.
-
-## Endpoint utama
-
-| Method | Endpoint | Akses | Kegunaan |
-| --- | --- | --- | --- |
-| `POST` | `/auth/register-guru` | Publik | Membuat akun guru |
-| `POST` | `/auth/register-siswa` | Publik | Membuat akun siswa |
-| `POST` | `/auth/login` | Publik | Login guru atau siswa |
-| `POST` | `/materi/upload` | Guru | Upload dan generate materi dari PDF |
-| `GET` | `/materi` | Guru/siswa | Daftar materi sesuai role |
-| `GET` | `/materi/:id/draft` | Guru | Melihat draft hasil AI |
-| `POST` | `/materi/:id/approve` | Guru | Approve atau reject materi |
-| `POST` | `/flashcard/manual` | Guru | Menambah flashcard manual |
-| `POST` | `/review` | Siswa | Menyimpan skor review SM-2 |
-| `GET` | `/review/schedule/:siswa_id` | Siswa | Jadwal review siswa |
-| `GET` | `/soal/materi/:id` | Guru/siswa | Mengambil soal materi published |
-| `POST` | `/soal/submit` | Siswa | Menilai dan menyimpan kuis |
-| `GET` | `/health` | Publik | Health check backend |
-
-Kontrak lengkap tersedia di [`docs/API_SPEC.md`](docs/API_SPEC.md).
-
-## Menjalankan test
-
-```bash
-# Backend
-cd backend-api
-npm ci
-npx prisma generate
-npm test
-
-# Frontend
-cd ../frontend-web
-npm ci
-npm test
-npm run build
-
-# AI service
-cd ../ai-service
-source .venv/bin/activate
-python -m pytest tests
-```
-
-## Mode offline dan Local Server Hub
-
-1. Jalankan ketiga service pada laptop server.
-2. Hubungkan laptop dan perangkat siswa ke Wi-Fi/hotspot yang sama.
-3. Cari IP lokal laptop (`ipconfig getifaddr en0` pada macOS atau `ipconfig` pada Windows).
-4. Buka `http://IP-LAPTOP:5173` dari perangkat siswa.
-5. Buka materi saat server tersedia agar aset dan data dapat masuk cache.
-6. Jika koneksi LAN terputus saat review, submission disimpan di IndexedDB dan dikirim ulang ketika tersambung.
-
-Database SQLite tetap menjadi source of truth. Jangan menggunakan IndexedDB sebagai penyimpanan progres permanen.
-
-## Alur penggunaan
-
-### Guru
-
-1. Login sebagai guru.
-2. Upload PDF dan beri judul materi.
-3. Tunggu proses generate AI.
-4. Tinjau serta edit rangkuman, flashcard, dan soal.
-5. Approve materi agar dapat diakses siswa.
-6. Gunakan input manual jika AI tidak tersedia.
-
-### Siswa
-
-1. Login sebagai siswa.
-2. Pilih materi yang sudah published.
-3. Baca rangkuman dan review flashcard.
-4. Berikan skor kualitas 0–5 untuk perhitungan SM-2.
-5. Kerjakan kuis dan lihat hasilnya.
-
-## Troubleshooting
-
-### Generate AI gagal
-
-- Pastikan `NIM_API_KEY` valid dan tidak memiliki spasi tambahan.
-- Pastikan laptop memiliki internet saat guru menekan generate.
-- Periksa health check: `curl http://localhost:5001/health`.
-- Pastikan PDF memiliki teks yang dapat diekstrak, bukan hanya gambar hasil scan.
-
-### Backend gagal menemukan database
-
-```bash
-cd backend-api
-npx prisma generate
-npx prisma migrate deploy
-```
-
-### Frontend tidak dapat mengakses backend dari HP
-
-- Gunakan IP laptop, bukan `localhost`, pada `VITE_BACKEND_API_URL`.
-- Jalankan Vite dengan `--host 0.0.0.0`.
-- Izinkan port `3000` dan `5173` pada firewall.
-
-### Service worker masih memakai versi lama
-
-Tutup seluruh tab SmartRecall, buka kembali aplikasi, atau hapus storage situs melalui DevTools lalu reload.
-
-## Dokumentasi
-
-- [Product Requirements Document](docs/PRD.md)
-- [Arsitektur sistem](docs/ARCHITECTURE.md)
-- [Spesifikasi API](docs/API_SPEC.md)
-- [Panduan desain](docs/design/contextual_learning_guide/DESIGN.md)
-
-## Keamanan sebelum deployment
-
-- Rotasi API key yang pernah dibagikan melalui chat, screenshot, atau commit.
-- Gunakan `JWT_SECRET` acak dan panjang.
-- Jangan commit `.env`, database SQLite, upload PDF, log, atau hasil build.
-- Ganti kredensial akun demo.
-- Batasi akses Local Server Hub hanya untuk jaringan sekolah yang dipercaya.
+> **Bahasa:** [Bahasa Indonesia](#bahasa-indonesia) | [English](#english)
 
 ---
 
-Dibangun untuk menghadirkan pembelajaran adaptif yang tetap dapat digunakan pada konektivitas terbatas.
+## English
+
+### Overview
+
+SmartRecall is an offline-first web and mobile application that helps students and teachers create, manage, and practice learning materials using AI-powered content generation and spaced repetition algorithms.
+
+**Key Features:**
+- AI-powered question and flashcard generation
+- Offline-first PWA (Progressive Web App)
+- Auto-sync when connection is available
+- Spaced Repetition (SM-2 Algorithm)
+- Learning analytics and statistics
+- Role-based access (Admin, Guru, Siswa)
+- PDF & PPT support
+
+### Tech Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| **Frontend** | React + Vite | Web UI with PWA support |
+| **Backend** | Node.js + Express | REST API |
+| **AI Service** | Python + Flask | LLM integration & content generation |
+| **Database** | SQLite/PostgreSQL | Data persistence |
+| **ORM** | Prisma | Database management |
+| **Real-time** | Socket.io | Live notifications |
+
+### Prerequisites
+
+Before installation, make sure you have:
+
+- Node.js v16 or higher (Download from https://nodejs.org/)
+- Python 3.8 or higher (Download from https://www.python.org/)
+- pip (usually comes with Python)
+- npm or yarn (comes with Node.js)
+
+### Quick Start
+
+#### Option 1: Automated Installation (Recommended)
+
+**For Windows:**
+```batch
+install.bat
+```
+
+**For macOS/Linux:**
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+The script will:
+- Check all prerequisites
+- Install all dependencies
+- Setup .env files automatically
+- Display next steps
+
+#### Option 2: Manual Installation
+
+**1. AI Service (Flask)**
+```bash
+cd ai-service
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your configuration
+python app.py
+```
+
+**2. Backend API (Node.js)**
+```bash
+cd backend-api
+npm install
+cp .env.example .env
+npx prisma migrate dev
+npm start
+```
+
+**3. Frontend Web (React)**
+```bash
+cd frontend-web
+npm install
+cp .env.example .env
+npm run dev
+```
+
+### Project Structure
+
+```
+smartrecall/
+├── ai-service/              # Python Flask service
+│   ├── app.py              # Main Flask app
+│   ├── routes/             # API routes
+│   ├── services/           # Business logic
+│   ├── utils/              # Helper functions
+│   ├── templates/          # PPT templates
+│   └── requirements.txt    # Python dependencies
+│
+├── backend-api/            # Node.js Express API
+│   ├── src/
+│   │   ├── controllers/    # Request handlers
+│   │   ├── routes/        # API endpoints
+│   │   ├── services/      # Business logic
+│   │   ├── middleware/    # Custom middleware
+│   │   └── socket.js      # Real-time events
+│   ├── prisma/            # Database schema
+│   ├── package.json       # Node dependencies
+│   └── jest.config.js     # Test configuration
+│
+├── frontend-web/          # React + Vite UI
+│   ├── src/
+│   │   ├── components/    # React components
+│   │   ├── pages/        # Page components
+│   │   ├── services/     # API client
+│   │   ├── offline/      # PWA & sync logic
+│   │   └── utils/        # Helper functions
+│   ├── public/           # Static assets
+│   ├── package.json      # Node dependencies
+│   └── vite.config.js    # Build configuration
+│
+└── docs/                  # Documentation
+    ├── API_SPEC.md       # API specification
+    ├── ARCHITECTURE.md   # System architecture
+    └── design/           # UI/UX designs
+```
+
+### Environment Configuration
+
+Copy .env.example to .env in each service and update with your values.
+
+**ai-service/.env:**
+```env
+# Provider default (nvidia atau gemini)
+AI_PROVIDER=nvidia
+
+# NVIDIA NIM Configuration
+NIM_API_KEY=your_nvidia_nim_api_key_here
+NIM_API_BASE_URL=https://integrate.api.nvidia.com/v1
+NIM_MODEL_NAME=meta/llama-3.1-8b-instruct
+NIM_REQUEST_TIMEOUT_SECONDS=60
+NIM_MAX_RETRIES=4
+NIM_RATE_LIMIT_SLEEP_SECONDS=30
+
+# Gemini Configuration (fallback provider)
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+GEMINI_MODEL_NAME=gemini-flash-latest
+
+# Task-splitting: set provider berbeda per jenis konten
+AI_PROVIDER_FLASHCARD=nvidia
+AI_PROVIDER_RANGKUMAN=nvidia
+AI_PROVIDER_SOAL=nvidia
+
+# Model per jenis konten
+NIM_MODEL_NAME_FLASHCARD=meta/llama-3.1-8b-instruct
+NIM_MODEL_NAME_RANGKUMAN=meta/llama-3.1-8b-instruct
+NIM_MODEL_NAME_SOAL=meta/llama-3.1-8b-instruct
+
+GEMINI_MODEL_NAME_FLASHCARD=gemini-flash-latest
+GEMINI_MODEL_NAME_RANGKUMAN=gemini-flash-latest
+GEMINI_MODEL_NAME_SOAL=gemini-pro-latest
+
+# Delay antar-request
+AI_INTER_REQUEST_DELAY_SECONDS=6
+
+# Flask Server
+FLASK_ENV=development
+PORT=5001
+UPLOAD_FOLDER=./uploads
+MAX_CONTENT_LENGTH_MB=20
+```
+
+**backend-api/.env:**
+```env
+# Server
+PORT=3000
+NODE_ENV=development
+
+# Database (SQLite for dev, PostgreSQL for production)
+DATABASE_URL="file:./database/dev.db"
+
+# Authentication
+JWT_SECRET=ganti_dengan_secret_yang_kuat_di_produksi
+JWT_EXPIRES_IN=7d
+
+# AI Service (HANYA backend-api yang memanggil, jangan di-expose ke frontend)
+AI_SERVICE_URL=http://localhost:5001
+AI_SERVICE_TIMEOUT_MS=180000
+
+# CORS
+FRONTEND_ORIGIN=http://localhost:5173
+```
+
+**frontend-web/.env:**
+```env
+# Backend API URL (satu-satunya service yang boleh diakses frontend)
+VITE_BACKEND_API_URL=http://localhost:3000
+```
+
+Important Notes:
+- Generate JWT_SECRET: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+- AI Service hanya diakses oleh backend-api, JANGAN dari frontend
+- Fallback provider otomatis terjadi jika provider utama gagal
+- Untuk production, gunakan PostgreSQL untuk DATABASE_URL
+- API keys JANGAN di-commit ke git atau share di publik
+
+### Running Services
+
+Open 3 terminal windows and run each service:
+
+```bash
+# Terminal 1: AI Service (port 5001)
+cd ai-service
+python app.py
+
+# Terminal 2: Backend API (port 3000)
+cd backend-api
+npm start
+
+# Terminal 3: Frontend Web (port 5173)
+cd frontend-web
+npm run dev
+```
+
+Then open: http://localhost:5173
+
+Service URLs:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
+- AI Service: http://localhost:5001 (hanya diakses backend, jangan dari frontend)
+
+### API Documentation
+
+Full API documentation is available in [docs/API_SPEC.md](docs/API_SPEC.md)
+
+Common endpoints:
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `GET /api/kelas` - Get classes
+- `POST /api/materi` - Create material
+- `GET /api/materi/:id` - Get material details
+- `POST /api/generate` - Generate questions via AI
+- `GET /api/soal` - Get practice questions
+- `POST /api/review` - Submit review/flashcard
+
+### Uninstallation
+
+To clean up all dependencies and cache:
+
+**For Windows:**
+```batch
+uninstall.bat
+```
+
+**For macOS/Linux:**
+```bash
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+This will remove:
+- node_modules
+- Python cache
+- .env files (keeps configuration)
+- Build artifacts
+
+### Troubleshooting
+
+**Issue: "Node.js is not installed"**
+- Solution: Install Node.js from https://nodejs.org/
+
+**Issue: "Python is not installed"**
+- Solution: Install Python from https://www.python.org/
+
+**Issue: npm install fails with permission error**
+- Solution: Try `npm install --force` or use `sudo` on macOS/Linux
+
+**Issue: Prisma migration fails**
+- Solution: Run `npx prisma migrate dev --name init` in backend-api folder
+
+**Issue: Port already in use**
+- Solution: Change PORT in .env file or kill process using the port
+
+**Issue: CORS errors**
+- Solution: Check FRONTEND_URL and VITE_API_URL in .env files
+
+### Development
+
+**Running tests:**
+```bash
+# Backend tests
+cd backend-api
+npm test
+
+# Frontend tests
+cd frontend-web
+npm test
+```
+
+**Building for production:**
+```bash
+# Frontend build
+cd frontend-web
+npm run build
+
+# Docker deployment
+docker-compose up --build
+```
+
+### Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Architecture
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed system architecture and data flow.
+
+### License
+
+This project is part of Universitas Telkom's educational initiative.
+
+### Support
+
+For issues and questions:
+- Email: support@smartrecall.local
+- Issues: GitHub Issues
+- Docs: docs/
+
+---
+
+## Bahasa Indonesia
+
+### Deskripsi Umum
+
+SmartRecall adalah aplikasi pembelajaran berbasis web dan mobile yang membantu siswa dan guru membuat, mengelola, dan berlatih materi pembelajaran menggunakan AI dan algoritma Spaced Repetition.
+
+**Fitur Utama:**
+- Pembangkit soal dan flashcard berbasis AI
+- Offline-first PWA (Progressive Web App)
+- Auto-sync ketika tersambung internet
+- Spaced Repetition (Algoritma SM-2)
+- Analytics dan statistik pembelajaran
+- Role-based access (Admin, Guru, Siswa)
+- Dukungan PDF & PPT
+
+### Stack Teknologi
+
+| Komponen | Teknologi | Fungsi |
+|----------|-----------|--------|
+| **Frontend** | React + Vite | UI web dengan PWA support |
+| **Backend** | Node.js + Express | REST API |
+| **AI Service** | Python + Flask | Integrasi LLM & pembangkit konten |
+| **Database** | SQLite/PostgreSQL | Penyimpanan data |
+| **ORM** | Prisma | Manajemen database |
+| **Real-time** | Socket.io | Notifikasi live |
+
+### Prasyarat
+
+Sebelum instalasi, pastikan Anda memiliki:
+
+- Node.js v16 atau lebih tinggi (Download dari https://nodejs.org/)
+- Python 3.8 atau lebih tinggi (Download dari https://www.python.org/)
+- pip (biasanya sudah termasuk dengan Python)
+- npm atau yarn (termasuk dengan Node.js)
+
+### Memulai Cepat
+
+#### Opsi 1: Instalasi Otomatis (Rekomendasi)
+
+**Untuk Windows:**
+```batch
+install.bat
+```
+
+**Untuk macOS/Linux:**
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+Script akan:
+- Mengecek semua prasyarat
+- Menginstal semua dependencies
+- Setup file .env otomatis
+- Menampilkan langkah selanjutnya
+
+#### Opsi 2: Instalasi Manual
+
+**1. AI Service (Flask)**
+```bash
+cd ai-service
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env dengan konfigurasi Anda
+python app.py
+```
+
+**2. Backend API (Node.js)**
+```bash
+cd backend-api
+npm install
+cp .env.example .env
+npx prisma migrate dev
+npm start
+```
+
+**3. Frontend Web (React)**
+```bash
+cd frontend-web
+npm install
+cp .env.example .env
+npm run dev
+```
+
+### Struktur Project
+
+```
+smartrecall/
+├── ai-service/              # Service Python Flask
+│   ├── app.py              # Aplikasi Flask utama
+│   ├── routes/             # Route API
+│   ├── services/           # Logika bisnis
+│   ├── utils/              # Fungsi helper
+│   ├── templates/          # Template PPT
+│   └── requirements.txt    # Dependencies Python
+│
+├── backend-api/            # API Node.js Express
+│   ├── src/
+│   │   ├── controllers/    # Handler request
+│   │   ├── routes/        # Endpoint API
+│   │   ├── services/      # Logika bisnis
+│   │   ├── middleware/    # Custom middleware
+│   │   └── socket.js      # Event real-time
+│   ├── prisma/            # Schema database
+│   ├── package.json       # Dependencies Node
+│   └── jest.config.js     # Konfigurasi test
+│
+├── frontend-web/          # UI React + Vite
+│   ├── src/
+│   │   ├── components/    # Komponen React
+│   │   ├── pages/        # Halaman komponen
+│   │   ├── services/     # Klien API
+│   │   ├── offline/      # PWA & logika sync
+│   │   └── utils/        # Fungsi helper
+│   ├── public/           # Asset statis
+│   ├── package.json      # Dependencies Node
+│   └── vite.config.js    # Konfigurasi build
+│
+└── docs/                  # Dokumentasi
+    ├── API_SPEC.md       # Spesifikasi API
+    ├── ARCHITECTURE.md   # Arsitektur sistem
+    └── design/           # Desain UI/UX
+```
+
+### Konfigurasi Environment
+
+Copy .env.example ke .env di setiap service dan update nilainya.
+
+**ai-service/.env:**
+```env
+# Provider default (nvidia atau gemini)
+AI_PROVIDER=nvidia
+
+# NVIDIA NIM Configuration
+NIM_API_KEY=your_nvidia_nim_api_key_here
+NIM_API_BASE_URL=https://integrate.api.nvidia.com/v1
+NIM_MODEL_NAME=meta/llama-3.1-8b-instruct
+NIM_REQUEST_TIMEOUT_SECONDS=60
+NIM_MAX_RETRIES=4
+NIM_RATE_LIMIT_SLEEP_SECONDS=30
+
+# Gemini Configuration (fallback provider)
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+GEMINI_MODEL_NAME=gemini-flash-latest
+
+# Task-splitting: set provider berbeda per jenis konten
+AI_PROVIDER_FLASHCARD=nvidia
+AI_PROVIDER_RANGKUMAN=nvidia
+AI_PROVIDER_SOAL=nvidia
+
+# Model per jenis konten
+NIM_MODEL_NAME_FLASHCARD=meta/llama-3.1-8b-instruct
+NIM_MODEL_NAME_RANGKUMAN=meta/llama-3.1-8b-instruct
+NIM_MODEL_NAME_SOAL=meta/llama-3.1-8b-instruct
+
+GEMINI_MODEL_NAME_FLASHCARD=gemini-flash-latest
+GEMINI_MODEL_NAME_RANGKUMAN=gemini-flash-latest
+GEMINI_MODEL_NAME_SOAL=gemini-pro-latest
+
+# Delay antar-request
+AI_INTER_REQUEST_DELAY_SECONDS=6
+
+# Flask Server
+FLASK_ENV=development
+PORT=5001
+UPLOAD_FOLDER=./uploads
+MAX_CONTENT_LENGTH_MB=20
+```
+
+**backend-api/.env:**
+```env
+# Server
+PORT=3000
+NODE_ENV=development
+
+# Database (SQLite for dev, PostgreSQL for production)
+DATABASE_URL="file:./database/dev.db"
+
+# Authentication
+JWT_SECRET=ganti_dengan_secret_yang_kuat_di_produksi
+JWT_EXPIRES_IN=7d
+
+# AI Service (HANYA backend-api yang memanggil, jangan di-expose ke frontend)
+AI_SERVICE_URL=http://localhost:5001
+AI_SERVICE_TIMEOUT_MS=180000
+
+# CORS
+FRONTEND_ORIGIN=http://localhost:5173
+```
+
+**frontend-web/.env:**
+```env
+# Backend API URL (satu-satunya service yang boleh diakses frontend)
+VITE_BACKEND_API_URL=http://localhost:3000
+```
+
+Catatan Penting:
+- Generate JWT_SECRET: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+- AI Service hanya diakses oleh backend-api, JANGAN dari frontend
+- Fallback provider otomatis terjadi jika provider utama gagal
+- Untuk production, gunakan PostgreSQL untuk DATABASE_URL
+- API keys JANGAN di-commit ke git atau share di publik
+
+### Menjalankan Service
+
+Buka 3 terminal dan jalankan setiap service:
+
+```bash
+# Terminal 1: AI Service (port 5001)
+cd ai-service
+python app.py
+
+# Terminal 2: Backend API (port 3000)
+cd backend-api
+npm start
+
+# Terminal 3: Frontend Web (port 5173)
+cd frontend-web
+npm run dev
+```
+
+Lalu buka: http://localhost:5173
+
+URL Service:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
+- AI Service: http://localhost:5001 (hanya diakses backend, jangan dari frontend)
+
+### Dokumentasi API
+
+Dokumentasi API lengkap tersedia di [docs/API_SPEC.md](docs/API_SPEC.md)
+
+Endpoint umum:
+- `POST /api/auth/login` - Login pengguna
+- `POST /api/auth/register` - Registrasi pengguna
+- `GET /api/kelas` - Dapatkan daftar kelas
+- `POST /api/materi` - Buat materi baru
+- `GET /api/materi/:id` - Dapatkan detail materi
+- `POST /api/generate` - Pembangkit soal via AI
+- `GET /api/soal` - Dapatkan soal latihan
+- `POST /api/review` - Submit review/flashcard
+
+### Uninstal
+
+Untuk membersihkan semua dependencies dan cache:
+
+**Untuk Windows:**
+```batch
+uninstall.bat
+```
+
+**Untuk macOS/Linux:**
+```bash
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+Akan menghapus:
+- node_modules
+- Python cache
+- File .env (konfigurasi tetap aman)
+- Build artifacts
+
+### Troubleshooting
+
+**Masalah: "Node.js is not installed"**
+- Solusi: Instal Node.js dari https://nodejs.org/
+
+**Masalah: "Python is not installed"**
+- Solusi: Instal Python dari https://www.python.org/
+
+**Masalah: npm install gagal dengan error permission**
+- Solusi: Coba `npm install --force` atau gunakan `sudo` di macOS/Linux
+
+**Masalah: Prisma migration gagal**
+- Solusi: Jalankan `npx prisma migrate dev --name init` di folder backend-api
+
+**Masalah: Port sudah digunakan**
+- Solusi: Ubah PORT di file .env atau kill proses yang menggunakan port
+
+**Masalah: CORS errors**
+- Solusi: Cek FRONTEND_URL dan VITE_API_URL di file .env
+
+### Development
+
+**Menjalankan test:**
+```bash
+# Backend tests
+cd backend-api
+npm test
+
+# Frontend tests
+cd frontend-web
+npm test
+```
+
+**Build untuk production:**
+```bash
+# Frontend build
+cd frontend-web
+npm run build
+
+# Docker deployment
+docker-compose up --build
+```
+
+### Kontribusi
+
+1. Fork repository
+2. Buat branch feature (`git checkout -b feature/FiturBaru`)
+3. Commit perubahan Anda (`git commit -m 'Tambah FiturBaru'`)
+4. Push ke branch (`git push origin feature/FiturBaru`)
+5. Buka Pull Request
+
+### Arsitektur
+
+Lihat [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) untuk detail arsitektur sistem dan data flow.
+
+### Lisensi
+
+Project ini adalah bagian dari inisiatif pendidikan Universitas Telkom.
+
+### Support
+
+Untuk pertanyaan dan isu:
+- Email: support@smartrecall.local
+- Issues: GitHub Issues
+- Docs: docs/
+
+---
+
+## Environment Files
+
+Template .env.example disediakan untuk setiap service:
+
+**ai-service.env.example**
+- Konfigurasi NVIDIA NIM API (model LLAMA)
+- Konfigurasi Gemini API (fallback provider)
+- Task-splitting untuk flashcard, rangkuman, soal
+- Delay antar-request dan upload settings
+
+**backend-api.env.example**
+- Konfigurasi server dan database
+- JWT secret dan expiry
+- URL ke AI Service (untuk backend hanya)
+- CORS settings
+
+**frontend-web.env.example**
+- URL Backend API (hanya service yang diakses frontend)
+- JANGAN pernah menambahkan URL AI Service di sini
+
+Important:
+- Setiap .env.example file sudah siap di-copy menjadi .env
+- Ganti placeholder values (your_*_here) dengan nilai asli Anda
+- JANGAN commit .env ke git - hanya .env.example yang di-commit
+- Jika API key pernah ter-expose, rotate/revoke melalui dashboard provider
+
+---
+
+## Installation Scripts
+
+This project includes automated installation scripts:
+
+| Script | OS | Purpose |
+|--------|----|----|
+| install.bat | Windows | Auto-install all dependencies |
+| install.sh | macOS/Linux | Auto-install all dependencies |
+| uninstall.bat | Windows | Clean all dependencies & cache |
+| uninstall.sh | macOS/Linux | Clean all dependencies & cache |
+
+### Features
+
+**Automatic:**
+- Checks for Node.js, npm, Python, and pip
+- Creates .env files from .env.example
+- Installs all dependencies in correct order
+- Shows helpful error messages
+- Displays next steps after installation
+
+**Uninstall scripts clean:**
+- node_modules folders
+- Python cache (__pycache__, .pytest_cache)
+- Build artifacts (dist, .vite)
+- package-lock.json files
+- .prisma cache
+
+---
+
+## Next Steps
+
+1. **Review Configuration:**
+   - Edit .env files in each service
+   - Configure API keys and URLs
+
+2. **Setup Database:**
+   - Run Prisma migrations: cd backend-api && npx prisma migrate dev
+   - Seed initial data if needed
+
+3. **Start Development:**
+   - Open 3 terminals for each service
+   - Run services in order: AI Service -> Backend -> Frontend
+   - Access http://localhost:5173
+
+4. **Read Documentation:**
+   - API Specification (docs/API_SPEC.md)
+   - System Architecture (docs/ARCHITECTURE.md)
+   - UI/UX Designs in (docs/design/)
+
+---
+
+**Happy Learning**
+
+For more information, visit the [docs](docs/) folder.
