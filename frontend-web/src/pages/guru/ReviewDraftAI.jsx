@@ -90,7 +90,10 @@ export default function ReviewDraftAI() {
           }
         }).then(() => {
           navigate('/guru/dashboard', { 
-            state: location.state || { returnGroupId: materi.groupId || null } 
+            state: { 
+              returnGroupId: location.state?.returnGroupId ?? materi.groupId ?? null,
+              breadcrumb: location.state?.breadcrumb 
+            } 
           });
         });
       } else {
